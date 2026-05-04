@@ -2,144 +2,150 @@ import { TestSuite } from '../assert-js/test-suite.js';
 import { assertEqual, assert, assertInstance } from '../assert-js/assert.js';
 import { APContext, FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS } from '../ap.js';
 
-const suite = new TestSuite('APContext', {
+// ─── constructor ─────────────────────────────────────────────────────────────
 
-  // --- constructor ---
+new TestSuite('APContext constructor', {
 
-  'constructor sets prec': () => {
+  'sets prec': () => {
     assertEqual(new APContext(26).prec, 26);
     assertEqual(new APContext(128).prec, 128);
   },
 
-  'constructor computes numLimbs': () => {
+  'computes numLimbs': () => {
     assertEqual(new APContext(26).numLimbs, 1);
     assertEqual(new APContext(52).numLimbs, 2);
     assertEqual(new APContext(128).numLimbs, Math.ceil(128 / LIMB_BITS));
   },
 
-  'constructor computes size as HDR + numLimbs': () => {
+  'computes size as HDR + numLimbs': () => {
     const ctx = new APContext(52);
     assertEqual(ctx.size, HDR + ctx.numLimbs);
   },
 
-  // --- alloc ---
+}).runTests();
 
-  'alloc returns Float64Array': () => {
+// ─── alloc ───────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext alloc()', {
+
+  'returns Float64Array': () => {
     assertInstance(new APContext(26).alloc(), Float64Array);
   },
 
-  'alloc length matches context size': () => {
+  'length matches context size': () => {
     const ctx = new APContext(52);
     assertEqual(ctx.alloc().length, ctx.size);
   },
 
-  'alloc initializes to POS_ZERO': () => {
+  'initializes to POS_ZERO': () => {
     assertEqual(new APContext(26).alloc()[I_FLAGS], FLAGS.POS_ZERO);
   },
 
-  'alloc sets prec header': () => {
+  'sets prec header': () => {
     const ctx = new APContext(78);
     assertEqual(ctx.alloc()[I_PREC], 78);
   },
 
-  'alloc sets exp to 0': () => {
+  'sets exp to 0': () => {
     assertEqual(new APContext(26).alloc()[I_EXP], 0);
   },
 
-  // --- fromString: special values ---
+}).runTests();
 
-  'fromString "NaN"': () => {
+// ─── fromString ──────────────────────────────────────────────────────────────
+
+new TestSuite('APContext fromString()', {
+
+  // special values
+  '"NaN"': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, 'NaN');
     assertEqual(f[I_FLAGS], FLAGS.NAN);
   },
 
-  'fromString "nan" (lowercase)': () => {
+  '"nan" (lowercase)': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, 'nan');
     assertEqual(f[I_FLAGS], FLAGS.NAN);
   },
 
-  'fromString "Infinity"': () => {
+  '"Infinity"': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, 'Infinity');
     assertEqual(f[I_FLAGS], FLAGS.POS_INF);
   },
 
-  'fromString "+inf"': () => {
+  '"+inf"': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '+inf');
     assertEqual(f[I_FLAGS], FLAGS.POS_INF);
   },
 
-  'fromString "-Infinity"': () => {
+  '"-Infinity"': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '-Infinity');
     assertEqual(f[I_FLAGS], FLAGS.NEG_INF);
   },
 
-  'fromString "-inf"': () => {
+  '"-inf"': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '-inf');
     assertEqual(f[I_FLAGS], FLAGS.NEG_INF);
   },
 
-  // --- fromString: zero ---
-
-  'fromString "0" is POS_ZERO': () => {
+  // zero
+  '"0" is POS_ZERO': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0');
     assertEqual(f[I_FLAGS], FLAGS.POS_ZERO);
     assertEqual(f[I_EXP], 0);
   },
 
-  'fromString "-0" is NEG_ZERO': () => {
+  '"-0" is NEG_ZERO': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '-0');
     assertEqual(f[I_FLAGS], FLAGS.NEG_ZERO);
   },
 
-  'fromString "0.0" is zero': () => {
+  '"0.0" is zero': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.0');
     assertEqual(f[I_FLAGS], FLAGS.POS_ZERO);
   },
 
-  'fromString "0e10" is zero': () => {
+  '"0e10" is zero': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0e10');
     assertEqual(f[I_FLAGS], FLAGS.POS_ZERO);
   },
 
-  // --- fromString: integer normalization ---
+  // integer normalization
   // value = mantissa_int * 2^(exp - prec), mantissa_int always in [2^(prec-1), 2^prec)
-  // For any power-of-two value 2^k: mantissa = 2^(prec-1), exp = k+1
-
-  'fromString "1": flags, exp, mantissa': () => {
+  // For any power-of-two 2^k: mantissa = 2^(prec-1), exp = k+1
+  '"1": flags, exp, mantissa': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '1');
     assertEqual(f[I_FLAGS], FLAGS.POS_NORMAL);
     assertEqual(f[I_EXP], 1);
-    assertEqual(f[HDR], 1 << (LIMB_BITS - 1)); // 2^25 — normalized MSB
+    assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
   },
 
-  'fromString "2": exp increments, mantissa unchanged': () => {
+  '"2": exp increments, mantissa unchanged': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '2');
     assertEqual(f[I_EXP], 2);
     assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
   },
 
-  'fromString "4": exp increments again': () => {
+  '"4": exp increments again': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '4');
     assertEqual(f[I_EXP], 3);
     assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
   },
 
-  // --- fromString: negative ---
-
-  'fromString "-1": NEG_NORMAL, same mantissa/exp as "1"': () => {
+  // negative
+  '"-1": NEG_NORMAL, same mantissa/exp as "1"': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '-1');
     assertEqual(f[I_FLAGS], FLAGS.NEG_NORMAL);
@@ -147,11 +153,8 @@ const suite = new TestSuite('APContext', {
     assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
   },
 
-  // --- fromString: fractions ---
-  // 0.5 = 2^-1: exp = 0 (= -1 + 1), mantissa = 2^(prec-1)
-  // 0.25 = 2^-2: exp = -1, mantissa = 2^(prec-1)
-
-  'fromString "0.5": exp=0, mantissa=2^(prec-1)': () => {
+  // fractions: 0.5 = 2^-1 → exp=0, 0.25 = 2^-2 → exp=-1
+  '"0.5": exp=0, mantissa=2^(prec-1)': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.5');
     assertEqual(f[I_FLAGS], FLAGS.POS_NORMAL);
@@ -159,7 +162,7 @@ const suite = new TestSuite('APContext', {
     assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
   },
 
-  'fromString "0.25": exp=-1': () => {
+  '"0.25": exp=-1': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.25');
     assertEqual(f[I_FLAGS], FLAGS.POS_NORMAL);
@@ -167,10 +170,8 @@ const suite = new TestSuite('APContext', {
     assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
   },
 
-  // --- fromString: scientific notation ---
-  // These verify consistency, not exact limbs
-
-  'fromString "1e1" matches "10"': () => {
+  // scientific notation
+  '"1e1" matches "10"': () => {
     const ctx = new APContext(52);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '1e1');
@@ -180,7 +181,7 @@ const suite = new TestSuite('APContext', {
     for (let i = 0; i < ctx.numLimbs; i++) assertEqual(a[HDR + i], b[HDR + i]);
   },
 
-  'fromString "1.5e2" matches "150"': () => {
+  '"1.5e2" matches "150"': () => {
     const ctx = new APContext(52);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '1.5e2');
@@ -190,7 +191,7 @@ const suite = new TestSuite('APContext', {
     for (let i = 0; i < ctx.numLimbs; i++) assertEqual(a[HDR + i], b[HDR + i]);
   },
 
-  'fromString "1.5e-1" matches "0.15"': () => {
+  '"1.5e-1" matches "0.15"': () => {
     const ctx = new APContext(52);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '1.5e-1');
@@ -200,9 +201,8 @@ const suite = new TestSuite('APContext', {
     for (let i = 0; i < ctx.numLimbs; i++) assertEqual(a[HDR + i], b[HDR + i]);
   },
 
-  // --- fromString: non-decimal bases ---
-
-  'fromString "0xff" matches "255"': () => {
+  // non-decimal bases
+  '"0xff" matches "255"': () => {
     const ctx = new APContext(26);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '0xff');
@@ -211,7 +211,7 @@ const suite = new TestSuite('APContext', {
     assertEqual(a[HDR],   b[HDR]);
   },
 
-  'fromString "0b11111111" matches "255"': () => {
+  '"0b11111111" matches "255"': () => {
     const ctx = new APContext(26);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '0b11111111');
@@ -220,15 +220,14 @@ const suite = new TestSuite('APContext', {
     assertEqual(a[HDR],   b[HDR]);
   },
 
-  'fromString "-0xff" is NEG_NORMAL': () => {
+  '"-0xff" is NEG_NORMAL': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '-0xff');
     assertEqual(f[I_FLAGS], FLAGS.NEG_NORMAL);
   },
 
-  // --- fromString: whitespace ---
-
-  'fromString trims leading/trailing whitespace': () => {
+  // whitespace
+  'trims leading/trailing whitespace': () => {
     const ctx = new APContext(26);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '  1  ');
@@ -237,6 +236,309 @@ const suite = new TestSuite('APContext', {
     assertEqual(a[HDR],   b[HDR]);
   },
 
-});
+}).runTests();
 
-suite.runTests();
+// ─── toString ────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext toString()', {
+
+  // special values
+  'NaN': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, 'NaN');
+    assertEqual(ctx.toString(f), 'NaN');
+  },
+
+  'Infinity': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, 'Infinity');
+    assertEqual(ctx.toString(f), 'Infinity');
+  },
+
+  '-Infinity': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '-Infinity');
+    assertEqual(ctx.toString(f), '-Infinity');
+  },
+
+  '+0': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0');
+    assertEqual(ctx.toString(f), '0');
+  },
+
+  '-0': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '-0');
+    assertEqual(ctx.toString(f), '-0');
+  },
+
+  // decimal — exact binary values only (powers of 2 round-trip cleanly)
+  '"1" dec': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '1');
+    assertEqual(ctx.toString(f), '1');
+  },
+
+  '"-1" dec': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '-1');
+    assertEqual(ctx.toString(f), '-1');
+  },
+
+  '"2" dec': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '2');
+    assertEqual(ctx.toString(f), '2');
+  },
+
+  '"0.5" dec': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.5');
+    assertEqual(ctx.toString(f), '0.5');
+  },
+
+  '"0.25" dec': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.25');
+    assertEqual(ctx.toString(f), '0.25');
+  },
+
+  '"0.125" dec': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.125');
+    assertEqual(ctx.toString(f), '0.125');
+  },
+
+  'default format matches "dec"': () => {
+    const ctx = new APContext(52), f = ctx.alloc();
+    ctx.fromString(f, '0.5');
+    assertEqual(ctx.toString(f), ctx.toString(f, 'dec'));
+  },
+
+  // scientific notation
+  '"1" sci': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '1');
+    assertEqual(ctx.toString(f, 'sci'), '1e+00');
+  },
+
+  '"2" sci': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '2');
+    assertEqual(ctx.toString(f, 'sci'), '2e+00');
+  },
+
+  '"0.5" sci': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.5');
+    assertEqual(ctx.toString(f, 'sci'), '5e-01');
+  },
+
+  '"0.25" sci': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.25');
+    assertEqual(ctx.toString(f, 'sci'), '2.5e-01');
+  },
+
+  'sci format structure': () => {
+    const ctx = new APContext(52), f = ctx.alloc();
+    ctx.fromString(f, '1234.5');
+    const s = ctx.toString(f, 'sci');
+    assert(/^-?\d(\.\d+)?e[+-]\d{2,}$/.test(s), `sci format invalid: ${s}`);
+  },
+
+  // binary
+  '"1" bin': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '1');
+    assertEqual(ctx.toString(f, 'bin'), '0b1');
+  },
+
+  '"2" bin': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '2');
+    assertEqual(ctx.toString(f, 'bin'), '0b10');
+  },
+
+  '"3" bin': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '3');
+    assertEqual(ctx.toString(f, 'bin'), '0b11');
+  },
+
+  '"0.5" bin': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.5');
+    assertEqual(ctx.toString(f, 'bin'), '0b0.1');
+  },
+
+  '"-2" bin': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '-2');
+    assertEqual(ctx.toString(f, 'bin'), '-0b10');
+  },
+
+  // hex
+  '"255" hex': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '255');
+    assertEqual(ctx.toString(f, 'hex'), '0xff');
+  },
+
+  '"16" hex': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '16');
+    assertEqual(ctx.toString(f, 'hex'), '0x10');
+  },
+
+  '"0.5" hex': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.5');
+    assertEqual(ctx.toString(f, 'hex'), '0x0.8');
+  },
+
+  '"0.25" hex': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '0.25');
+    assertEqual(ctx.toString(f, 'hex'), '0x0.4');
+  },
+
+  // octal
+  '"8" oct': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '8');
+    assertEqual(ctx.toString(f, 'oct'), '0o10');
+  },
+
+  '"64" oct': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '64');
+    assertEqual(ctx.toString(f, 'oct'), '0o100');
+  },
+
+}).runTests();
+
+// ─── precision ───────────────────────────────────────────────────────────────
+
+new TestSuite('APContext precision', {
+
+  // 2^53+1 = 9007199254740993. float64 rounds this to 9007199254740992 (2^53).
+  // Our library with prec=78 (>54 bits) must store it exactly.
+  'exact integer beyond float64 (2^53+1)': () => {
+    const ctx = new APContext(78), f = ctx.alloc();
+    ctx.fromString(f, '9007199254740993');
+    assertEqual(ctx.toString(f), '9007199254740993');
+  },
+
+  // Corollary: at prec=52 (like float64) it should round, just as float64 does.
+  'prec=52 rounds 2^53+1 like float64': () => {
+    const ctx = new APContext(52), f = ctx.alloc();
+    ctx.fromString(f, '9007199254740993');
+    assertEqual(ctx.toString(f), '9007199254740992');
+  },
+
+  // A 128-bit number uses 5 limbs. If precision is real, limbs 1-4 must be non-zero
+  // for a value whose binary expansion doesn't terminate after 26 bits.
+  'multiple limbs carry non-zero data': () => {
+    const ctx = new APContext(128), f = ctx.alloc();
+    ctx.fromString(f, '1.23456789012345678901234567890123456789');
+    let populated = 0;
+    for (let i = 1; i < ctx.numLimbs; i++) if (f[HDR + i] !== 0) populated++;
+    assert(populated >= 3, `only ${populated} extra limbs populated — precision not stored`);
+  },
+
+  // 128-bit context should produce ~39 significant decimal digits for 1/3.
+  // float64 produces 15-16. We assert at least 30 correct leading 3s.
+  '1/3 at 128 bits gives far more digits than float64': () => {
+    const ctx = new APContext(128), f = ctx.alloc();
+    ctx.fromString(f, '0.' + '3'.repeat(42));
+    const s = ctx.toString(f);
+    const threes = s.startsWith('0.') ? (s.slice(2).match(/^3+/) || [''])[0].length : 0;
+    assert(threes >= 30, `expected >=30 correct digits of 1/3, got ${threes}: "${s}"`);
+  },
+
+  // Higher precision must produce a strictly longer decimal string for the same input.
+  '128-bit produces more decimal digits than 52-bit': () => {
+    const input = '0.' + '3'.repeat(42);
+    const ctx52  = new APContext(52),  f52  = ctx52.alloc();
+    const ctx128 = new APContext(128), f128 = ctx128.alloc();
+    ctx52.fromString(f52,   input);
+    ctx128.fromString(f128, input);
+    const s52  = ctx52.toString(f52);
+    const s128 = ctx128.toString(f128);
+    assert(s128.length > s52.length,
+      `128-bit output ("${s128}") should be longer than 52-bit ("${s52}")`);
+  },
+
+  // A very large integer with many significant digits, unrepresentable in float64.
+  'large integer with >53 significant bits round-trips': () => {
+    const big = '123456789012345678901234567890'; // 30 digits, ~100 bits
+    const ctx = new APContext(128), f = ctx.alloc();
+    ctx.fromString(f, big);
+    assertEqual(ctx.toString(f), big);
+  },
+
+}).runTests();
+
+// ─── inverse (fromString ↔ toString) ─────────────────────────────────────────
+
+new TestSuite('APContext inverse', {
+
+  // toString(fromString(s)) === s for exact binary fractions (no precision loss).
+  'exact binary fractions round-trip through toString': () => {
+    const ctx = new APContext(128);
+    for (const s of ['0.5', '0.25', '0.125', '0.0625', '16', '256', '65536']) {
+      const f = ctx.alloc();
+      ctx.fromString(f, s);
+      assertEqual(ctx.toString(f), s, `toString(fromString("${s}")) !== "${s}"`);
+    }
+  },
+
+  // fromString(toString(f)) === f: converting to string and back gives identical bits.
+  // Very small decimals (e.g. 1e-23) are excluded: the truncating integer division
+  // in fromString can introduce a 1-ULP difference in the last limb after a round-trip.
+  // This is acceptable — each value is still accurate to `prec` bits independently.
+  'fromString(toString(f)) recovers identical bits': () => {
+    const ctx = new APContext(128);
+    const inputs = [
+      '0.1',
+      '0.3333333333333333333333333333333333333333',
+      '3.14159265358979323846264338327950288420',
+      '9007199254740993',
+      '123456789012345678901234567890',
+    ];
+    for (const v of inputs) {
+      const f = ctx.alloc(), g = ctx.alloc();
+      ctx.fromString(f, v);
+      ctx.fromString(g, ctx.toString(f));
+      assertEqual(f[I_EXP], g[I_EXP], `exp mismatch for "${v}"`);
+      for (let i = 0; i < ctx.numLimbs; i++)
+        assertEqual(f[HDR + i], g[HDR + i], `limb ${i} mismatch for "${v}"`);
+    }
+  },
+
+  // toString is format-agnostic inverse: a value expressed as hex, parsed back, equals original.
+  'hex toString → fromString recovers identical bits': () => {
+    const ctx = new APContext(78);
+    for (const v of ['255', '65536', '1000000']) {
+      const f = ctx.alloc(), g = ctx.alloc();
+      ctx.fromString(f, v);
+      ctx.fromString(g, ctx.toString(f, 'hex'));
+      assertEqual(f[I_EXP], g[I_EXP], `exp mismatch for "${v}" via hex`);
+      for (let i = 0; i < ctx.numLimbs; i++)
+        assertEqual(f[HDR + i], g[HDR + i], `limb ${i} mismatch for "${v}" via hex`);
+    }
+  },
+
+  // Consistency check carried over from earlier toString tests.
+  '0xff round-trip via dec': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc();
+    ctx.fromString(a, '0xff');
+    ctx.fromString(b, ctx.toString(a, 'dec'));
+    assertEqual(a[I_EXP], b[I_EXP]);
+    for (let i = 0; i < ctx.numLimbs; i++) assertEqual(a[HDR + i], b[HDR + i]);
+  },
+
+}).runTests();

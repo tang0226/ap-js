@@ -25,7 +25,7 @@ const isNaN    = (f) => f[I_FLAGS] === 6;
 
 
 export class APContext {
-  constructor(prec, guard = 4) {
+  constructor(prec, guard = 16) {
     this.prec     = prec;
     this.guard    = guard;
     this.numLimbs = Math.ceil(prec / LIMB_BITS);
@@ -38,6 +38,33 @@ export class APContext {
     f[I_FLAGS] = FLAGS.POS_ZERO;
     f[I_EXP]   = 0;
     return f;
+  }
+
+  toString(f, format = 'dec') {
+    if (f[I_FLAGS] === FLAGS.NAN)     return 'NaN';
+    if (f[I_FLAGS] === FLAGS.POS_INF) return 'Infinity';
+    if (f[I_FLAGS] === FLAGS.NEG_INF) return '-Infinity';
+    if (f[I_FLAGS] <= 1)              return (f[I_FLAGS] & 1) ? '-0' : '0';
+
+    const sign = (f[I_FLAGS] & 1) ? '-' : '';
+    const exp  = f[I_EXP] | 0;
+
+    // Reconstruct mantissa as BigInt from big-endian limbs
+    let mantissa = 0n;
+    const lbits  = BigInt(LIMB_BITS);
+    for (let i = 0; i < this.numLimbs; i++)
+      mantissa = (mantissa << lbits) | BigInt(f[HDR + i]);
+
+    // value = mantissa * 2^shift
+    const shift = exp - this.prec;
+
+    switch (format) {
+      case 'bin': return sign + _toBaseStr(mantissa, shift, 1, '0b');
+      case 'oct': return sign + _toBaseStr(mantissa, shift, 3, '0o');
+      case 'hex': return sign + _toBaseStr(mantissa, shift, 4, '0x');
+      case 'sci': return sign + _toSciStr(mantissa, shift, this.prec);
+      default:    return sign + _toDecStr(mantissa, shift, this.prec);
+    }
   }
 
   fromString(dst, s) {
@@ -139,6 +166,71 @@ function _setFromBigInt(dst, val, neg, prec, numLimbs) {
     dst[HDR + i] = Number(mantissa & mask);
     mantissa >>= lbits;
   }
+}
+
+// Convert mantissa*2^shift to a decimal string with enough digits for `prec` bits.
+function _toDecStr(mantissa, shift, prec) {
+  if (shift >= 0) return (mantissa << BigInt(shift)).toString(10);
+
+  const negShift = BigInt(-shift);
+  const intPart  = mantissa >> negShift;
+  const fracBits = mantissa & ((1n << negShift) - 1n);
+
+  if (fracBits === 0n) return intPart.toString(10);
+
+  // Multiply frac by 10^numDig then integer-divide by 2^negShift to get decimal digits
+  const numDig = Math.ceil(prec * Math.log10(2)) + 2;
+  const scaled  = (fracBits * (10n ** BigInt(numDig))) >> negShift;
+  const fracStr = scaled.toString(10).padStart(numDig, '0').replace(/0+$/, '');
+
+  return intPart.toString(10) + '.' + fracStr;
+}
+
+// Convert to scientific notation: d.dddde±XX
+function _toSciStr(mantissa, shift, prec) {
+  const dec     = _toDecStr(mantissa, shift, prec);
+  const dotIdx  = dec.indexOf('.');
+  const intStr  = dotIdx === -1 ? dec : dec.slice(0, dotIdx);
+  const fracStr = dotIdx === -1 ? '' : dec.slice(dotIdx + 1);
+  const allDig  = intStr + fracStr;
+
+  let decExp, sigDig;
+  if (intStr !== '0') {
+    decExp = intStr.length - 1;
+    sigDig = allDig;
+  } else {
+    const nz = fracStr.search(/[1-9]/);
+    decExp   = -(nz + 1);
+    sigDig   = fracStr.slice(nz);
+  }
+
+  const body    = sigDig.length > 1 ? sigDig[0] + '.' + sigDig.slice(1) : sigDig[0];
+  const expSign = decExp >= 0 ? '+' : '-';
+  const expStr  = String(Math.abs(decExp)).padStart(2, '0');
+  return body + 'e' + expSign + expStr;
+}
+
+// Convert to hex/oct/bin, including fractional notation (e.g. "0b1.1" for 1.5).
+// bitsPerDigit: 4=hex, 3=oct, 1=bin
+function _toBaseStr(mantissa, shift, bitsPerDigit, prefix) {
+  const radix = 2 ** bitsPerDigit;
+
+  if (shift >= 0) return prefix + (mantissa << BigInt(shift)).toString(radix);
+
+  const negShift = BigInt(-shift);
+  const intPart  = mantissa >> negShift;
+  const fracBits = mantissa & ((1n << negShift) - 1n);
+
+  if (fracBits === 0n) return prefix + intPart.toString(radix);
+
+  // Pad frac bits up to a multiple of bitsPerDigit so each digit is complete
+  const rem     = Number(negShift) % bitsPerDigit;
+  const padBits = rem === 0 ? 0 : bitsPerDigit - rem;
+  const fracLen = (Number(negShift) + padBits) / bitsPerDigit;
+  const fracStr = (fracBits << BigInt(padBits)).toString(radix)
+    .padStart(fracLen, '0').replace(/0+$/, '');
+
+  return prefix + intPart.toString(radix) + '.' + fracStr;
 }
 
 export { FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS, LIMB_BASE, LIMB_MASK, isNeg, isNormal, isZero, isInf, isNaN };

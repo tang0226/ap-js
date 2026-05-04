@@ -1,0 +1,3 @@
+[submodule "assert-js"]
+	path = assert-js
+	url = git@github.com:tang0226/assert-js

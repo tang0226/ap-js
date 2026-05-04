@@ -320,31 +320,31 @@ new TestSuite('APContext toString()', {
   '"1" sci': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '1');
-    assertEqual(ctx.toString(f, 'sci'), '1e+00');
+    assertEqual(ctx.toString(f, 'e'), '1e+00');
   },
 
   '"2" sci': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '2');
-    assertEqual(ctx.toString(f, 'sci'), '2e+00');
+    assertEqual(ctx.toString(f, 'e'), '2e+00');
   },
 
   '"0.5" sci': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.5');
-    assertEqual(ctx.toString(f, 'sci'), '5e-01');
+    assertEqual(ctx.toString(f, 'e'), '5e-01');
   },
 
   '"0.25" sci': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.25');
-    assertEqual(ctx.toString(f, 'sci'), '2.5e-01');
+    assertEqual(ctx.toString(f, 'e'), '2.5e-01');
   },
 
   'sci format structure': () => {
     const ctx = new APContext(52), f = ctx.alloc();
     ctx.fromString(f, '1234.5');
-    const s = ctx.toString(f, 'sci');
+    const s = ctx.toString(f, 'e');
     assert(/^-?\d(\.\d+)?e[+-]\d{2,}$/.test(s), `sci format invalid: ${s}`);
   },
 
@@ -352,69 +352,69 @@ new TestSuite('APContext toString()', {
   '"1" bin': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '1');
-    assertEqual(ctx.toString(f, 'bin'), '0b1');
+    assertEqual(ctx.toString(f, 'b'), '0b1');
   },
 
   '"2" bin': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '2');
-    assertEqual(ctx.toString(f, 'bin'), '0b10');
+    assertEqual(ctx.toString(f, 'b'), '0b10');
   },
 
   '"3" bin': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '3');
-    assertEqual(ctx.toString(f, 'bin'), '0b11');
+    assertEqual(ctx.toString(f, 'b'), '0b11');
   },
 
   '"0.5" bin': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.5');
-    assertEqual(ctx.toString(f, 'bin'), '0b0.1');
+    assertEqual(ctx.toString(f, 'b'), '0b0.1');
   },
 
   '"-2" bin': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '-2');
-    assertEqual(ctx.toString(f, 'bin'), '-0b10');
+    assertEqual(ctx.toString(f, 'b'), '-0b10');
   },
 
   // hex
   '"255" hex': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '255');
-    assertEqual(ctx.toString(f, 'hex'), '0xff');
+    assertEqual(ctx.toString(f, 'x'), '0xff');
   },
 
   '"16" hex': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '16');
-    assertEqual(ctx.toString(f, 'hex'), '0x10');
+    assertEqual(ctx.toString(f, 'x'), '0x10');
   },
 
   '"0.5" hex': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.5');
-    assertEqual(ctx.toString(f, 'hex'), '0x0.8');
+    assertEqual(ctx.toString(f, 'x'), '0x0.8');
   },
 
   '"0.25" hex': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '0.25');
-    assertEqual(ctx.toString(f, 'hex'), '0x0.4');
+    assertEqual(ctx.toString(f, 'x'), '0x0.4');
   },
 
   // octal
   '"8" oct': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '8');
-    assertEqual(ctx.toString(f, 'oct'), '0o10');
+    assertEqual(ctx.toString(f, 'o'), '0o10');
   },
 
   '"64" oct': () => {
     const ctx = new APContext(26), f = ctx.alloc();
     ctx.fromString(f, '64');
-    assertEqual(ctx.toString(f, 'oct'), '0o100');
+    assertEqual(ctx.toString(f, 'o'), '0o100');
   },
 
 }).runTests();
@@ -524,7 +524,7 @@ new TestSuite('APContext inverse', {
     for (const v of ['255', '65536', '1000000']) {
       const f = ctx.alloc(), g = ctx.alloc();
       ctx.fromString(f, v);
-      ctx.fromString(g, ctx.toString(f, 'hex'));
+      ctx.fromString(g, ctx.toString(f, 'x'));
       assertEqual(f[I_EXP], g[I_EXP], `exp mismatch for "${v}" via hex`);
       for (let i = 0; i < ctx.numLimbs; i++)
         assertEqual(f[HDR + i], g[HDR + i], `limb ${i} mismatch for "${v}" via hex`);

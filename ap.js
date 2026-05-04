@@ -40,7 +40,7 @@ export class APContext {
     return f;
   }
 
-  toString(f, format = 'dec') {
+  toString(f, format = '') {
     if (f[I_FLAGS] === FLAGS.NAN)     return 'NaN';
     if (f[I_FLAGS] === FLAGS.POS_INF) return 'Infinity';
     if (f[I_FLAGS] === FLAGS.NEG_INF) return '-Infinity';
@@ -59,10 +59,10 @@ export class APContext {
     const shift = exp - this.prec;
 
     switch (format) {
-      case 'bin': return sign + _toBaseStr(mantissa, shift, 1, '0b');
-      case 'oct': return sign + _toBaseStr(mantissa, shift, 3, '0o');
-      case 'hex': return sign + _toBaseStr(mantissa, shift, 4, '0x');
-      case 'sci': return sign + _toSciStr(mantissa, shift, this.prec);
+      case 'b': return sign + _toBaseStr(mantissa, shift, 1, '0b');
+      case 'o': return sign + _toBaseStr(mantissa, shift, 3, '0o');
+      case 'x': return sign + _toBaseStr(mantissa, shift, 4, '0x');
+      case 'e': return sign + _toSciStr(mantissa, shift, this.prec);
       default:    return sign + _toDecStr(mantissa, shift, this.prec);
     }
   }

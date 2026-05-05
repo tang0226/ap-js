@@ -32,11 +32,19 @@ export class APContext {
     this.size     = HDR + this.numLimbs;
   }
 
-  alloc() {
+  alloc(input) {
     const f = new Float64Array(this.size);
     f[I_PREC]  = this.prec;
     f[I_FLAGS] = FLAGS.POS_ZERO;
     f[I_EXP]   = 0;
+    if (typeof input === 'string') {
+      this.fromString(f, input);
+    } else if (typeof input === 'number') {
+      this.fromString(f, input.toString());
+    } else if (input instanceof Float64Array) {
+      if (input.length !== this.size) throw new RangeError('source array size mismatch');
+      f.set(input);
+    }
     return f;
   }
 

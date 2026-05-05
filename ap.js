@@ -312,6 +312,9 @@ export class APContext {
   }
 }
 
+// Alias
+APContext.prototype.ap = APContext.prototype.alloc;
+
 // Converts a non-negative BigInt into the flat-array float format.
 // value = val * 2^adjExp (adjExp applied by caller after this returns, default 0)
 function _setFromBigInt(dst, val, neg, prec, numLimbs) {

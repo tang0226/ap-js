@@ -50,6 +50,13 @@ new TestSuite('APContext alloc()', {
     assertEqual(new APContext(26).alloc()[I_EXP], 0);
   },
 
+  'ap() is an alias for alloc()': () => {
+    const ctx = new APContext(52);
+    assertEqual(ctx.ap, ctx.alloc);
+    assertInstance(ctx.ap(), Float64Array);
+    assertEqual(ctx.ap().length, ctx.size);
+  },
+
 }).runTests();
 
 // ─── fromString ──────────────────────────────────────────────────────────────
@@ -548,56 +555,56 @@ new TestSuite('APContext inverse', {
 new TestSuite('APContext neg()', {
 
   'neg(NaN) = NaN': () => {
-    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, 'NaN');
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
   },
 
   'neg(+0) = -0': () => {
-    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, '0');
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
   },
 
   'neg(-0) = +0': () => {
-    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, '-0');
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
   },
 
   'neg(+Inf) = -Inf': () => {
-    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, 'Infinity');
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
   },
 
   'neg(-Inf) = +Inf': () => {
-    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, '-Infinity');
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
   },
 
   'neg(1) = -1': () => {
-    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, '1');
     ctx.neg(dst, f);
     assertEqual(ctx.toString(dst), '-1');
   },
 
   'neg(-1) = 1': () => {
-    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, '-1');
     ctx.neg(dst, f);
     assertEqual(ctx.toString(dst), '1');
   },
 
   'neg preserves exp and limbs': () => {
-    const ctx = new APContext(52), f = ctx.alloc(), dst = ctx.alloc();
+    const ctx = new APContext(52), f = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, '1.5');
     ctx.neg(dst, f);
     assertEqual(dst[I_EXP], f[I_EXP]);
@@ -607,7 +614,7 @@ new TestSuite('APContext neg()', {
 
   'double neg recovers original bits': () => {
     const ctx = new APContext(52);
-    const f = ctx.alloc(), tmp = ctx.alloc(), dst = ctx.alloc();
+    const f = ctx.ap(), tmp = ctx.ap(), dst = ctx.ap();
     ctx.fromString(f, '0.75');
     ctx.neg(tmp, f);
     ctx.neg(dst, tmp);
@@ -618,7 +625,7 @@ new TestSuite('APContext neg()', {
   },
 
   'in-place neg(f, f) works': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(26), f = ctx.ap();
     ctx.fromString(f, '1');
     ctx.neg(f, f);
     assertEqual(ctx.toString(f), '-1');
@@ -633,7 +640,7 @@ new TestSuite('APContext add()', {
   // special values
   'NaN + x = NaN': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, 'NaN'); ctx.fromString(b, '1');
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
@@ -641,7 +648,7 @@ new TestSuite('APContext add()', {
 
   'x + NaN = NaN': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '1'); ctx.fromString(b, 'NaN');
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
@@ -649,7 +656,7 @@ new TestSuite('APContext add()', {
 
   '+Inf + -Inf = NaN': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, 'Infinity'); ctx.fromString(b, '-Infinity');
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
@@ -657,7 +664,7 @@ new TestSuite('APContext add()', {
 
   '+Inf + +Inf = +Inf': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, 'Infinity'); ctx.fromString(b, 'Infinity');
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
@@ -665,7 +672,7 @@ new TestSuite('APContext add()', {
 
   '-Inf + -Inf = -Inf': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '-Infinity'); ctx.fromString(b, '-Infinity');
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
@@ -673,7 +680,7 @@ new TestSuite('APContext add()', {
 
   '+Inf + normal = +Inf': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, 'Infinity'); ctx.fromString(b, '1');
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
@@ -681,7 +688,7 @@ new TestSuite('APContext add()', {
 
   '0 + x = x': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '0'); ctx.fromString(b, '4');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '4');
@@ -689,7 +696,7 @@ new TestSuite('APContext add()', {
 
   'x + 0 = x': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '0');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '4');
@@ -698,7 +705,7 @@ new TestSuite('APContext add()', {
   // same sign, aligned exponents
   '1 + 1 = 2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '1'); ctx.fromString(b, '1');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
@@ -706,7 +713,7 @@ new TestSuite('APContext add()', {
 
   '0.5 + 0.5 = 1 (carry normalization)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '0.5'); ctx.fromString(b, '0.5');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '1');
@@ -714,7 +721,7 @@ new TestSuite('APContext add()', {
 
   '0.5 + 0.25 = 0.75': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '0.5'); ctx.fromString(b, '0.25');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '0.75');
@@ -722,7 +729,7 @@ new TestSuite('APContext add()', {
 
   '-1 + (-1) = -2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '-1'); ctx.fromString(b, '-1');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
@@ -731,7 +738,7 @@ new TestSuite('APContext add()', {
   // same sign, misaligned exponents
   '1 + 0.5 = 1.5 (expDiff=1)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '1'); ctx.fromString(b, '0.5');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '1.5');
@@ -739,7 +746,7 @@ new TestSuite('APContext add()', {
 
   '4 + 2 = 6 (expDiff=1)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '2');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '6');
@@ -747,7 +754,7 @@ new TestSuite('APContext add()', {
 
   '8 + 2 = 10 (expDiff=2)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '8'); ctx.fromString(b, '2');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '10');
@@ -756,7 +763,7 @@ new TestSuite('APContext add()', {
   // b negligible: iDiff >= numLimbs → early return with a
   'b negligible at single-limb precision': () => {
     const ctx = new APContext(26);  // numLimbs = 1
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '67108864');  // 2^26, exp=27; iDiff=1 = numLimbs → negligible
     ctx.fromString(b, '1');
     ctx.add(dst, a, b);
@@ -766,7 +773,7 @@ new TestSuite('APContext add()', {
   // exercises offset=0, iDiff=1, numLimbs=2 path (covers roundBit branch at line 165-166)
   '2^26 + 1 at prec=52 (offset=0, iDiff=1)': () => {
     const ctx = new APContext(52);  // numLimbs = 2
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '67108864');  // 2^26
     ctx.fromString(b, '1');
     ctx.add(dst, a, b);
@@ -776,7 +783,7 @@ new TestSuite('APContext add()', {
   // different sign: magnitude subtraction
   '4 + (-2) = 2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '-2');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
@@ -784,7 +791,7 @@ new TestSuite('APContext add()', {
 
   '2 + (-4) = -2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '2'); ctx.fromString(b, '-4');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
@@ -792,7 +799,7 @@ new TestSuite('APContext add()', {
 
   '4 + (-4) = 0 (exact cancellation)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '-4');
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
@@ -800,7 +807,7 @@ new TestSuite('APContext add()', {
 
   '-4 + 2 = -2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '-4'); ctx.fromString(b, '2');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
@@ -808,7 +815,7 @@ new TestSuite('APContext add()', {
 
   '1 + (-0.5) = 0.5': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '1'); ctx.fromString(b, '-0.5');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '0.5');
@@ -816,7 +823,7 @@ new TestSuite('APContext add()', {
 
   '4 + (-1) = 3 (borrow propagation)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '-1');
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '3');
@@ -825,7 +832,7 @@ new TestSuite('APContext add()', {
   // multi-limb precision
   '2^53 + 1 exact at prec=78': () => {
     const ctx = new APContext(78);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '9007199254740992'); // 2^53
     ctx.fromString(b, '1');
     ctx.add(dst, a, b);
@@ -835,7 +842,7 @@ new TestSuite('APContext add()', {
   // aliasing
   'dst === a (in-place a += b)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap();
     ctx.fromString(a, '1'); ctx.fromString(b, '1');
     ctx.add(a, a, b);
     assertEqual(ctx.toString(a), '2');
@@ -843,7 +850,7 @@ new TestSuite('APContext add()', {
 
   'dst === b (in-place b = a + b)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '2');
     ctx.add(b, a, b);
     assertEqual(ctx.toString(b), '6');
@@ -857,7 +864,7 @@ new TestSuite('APContext sub()', {
 
   '4 - 2 = 2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '2');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
@@ -865,7 +872,7 @@ new TestSuite('APContext sub()', {
 
   '2 - 4 = -2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '2'); ctx.fromString(b, '4');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
@@ -873,7 +880,7 @@ new TestSuite('APContext sub()', {
 
   '4 - 4 = 0': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '4');
     ctx.sub(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
@@ -881,7 +888,7 @@ new TestSuite('APContext sub()', {
 
   '1 - 0 = 1': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '1'); ctx.fromString(b, '0');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '1');
@@ -889,7 +896,7 @@ new TestSuite('APContext sub()', {
 
   '0 - 1 = -1': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '0'); ctx.fromString(b, '1');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '-1');
@@ -897,7 +904,7 @@ new TestSuite('APContext sub()', {
 
   '-2 - (-4) = 2': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '-2'); ctx.fromString(b, '-4');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
@@ -905,7 +912,7 @@ new TestSuite('APContext sub()', {
 
   '-4 - 2 = -6': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '-4'); ctx.fromString(b, '2');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '-6');
@@ -913,7 +920,7 @@ new TestSuite('APContext sub()', {
 
   '8 - 0.5 = 7.5 (fractional result)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '8'); ctx.fromString(b, '0.5');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '7.5');
@@ -921,7 +928,7 @@ new TestSuite('APContext sub()', {
 
   '4 - 1 = 3 (borrow propagation)': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '1');
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '3');
@@ -929,8 +936,8 @@ new TestSuite('APContext sub()', {
 
   'sub(a,b) = neg(sub(b,a))': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc();
-    const r1 = ctx.alloc(), r2 = ctx.alloc(), neg_r1 = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap();
+    const r1 = ctx.ap(), r2 = ctx.ap(), neg_r1 = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '2');
     ctx.sub(r1, a, b);       // 4 - 2 = 2
     ctx.sub(r2, b, a);       // 2 - 4 = -2
@@ -943,7 +950,7 @@ new TestSuite('APContext sub()', {
 
   'dst === b aliasing: b = a - b': () => {
     const ctx = new APContext(26);
-    const a = ctx.alloc(), b = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap();
     ctx.fromString(a, '4'); ctx.fromString(b, '1');
     ctx.sub(b, a, b);
     assertEqual(ctx.toString(b), '3');
@@ -951,7 +958,7 @@ new TestSuite('APContext sub()', {
 
   'large exact subtraction at prec=78': () => {
     const ctx = new APContext(78);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '9007199254740993'); // 2^53 + 1
     ctx.fromString(b, '1');
     ctx.sub(dst, a, b);
@@ -960,7 +967,7 @@ new TestSuite('APContext sub()', {
 
   'multi-limb cancellation leaves correct result': () => {
     const ctx = new APContext(78);
-    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    const a = ctx.ap(), b = ctx.ap(), dst = ctx.ap();
     ctx.fromString(a, '9007199254740993'); // 2^53 + 1
     ctx.fromString(b, '9007199254740992'); // 2^53
     ctx.sub(dst, a, b);

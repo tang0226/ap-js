@@ -542,3 +542,429 @@ new TestSuite('APContext inverse', {
   },
 
 }).runTests();
+
+// ─── neg ─────────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext neg()', {
+
+  'neg(NaN) = NaN': () => {
+    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, 'NaN');
+    ctx.neg(dst, f);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'neg(+0) = -0': () => {
+    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, '0');
+    ctx.neg(dst, f);
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  'neg(-0) = +0': () => {
+    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, '-0');
+    ctx.neg(dst, f);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'neg(+Inf) = -Inf': () => {
+    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, 'Infinity');
+    ctx.neg(dst, f);
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  'neg(-Inf) = +Inf': () => {
+    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, '-Infinity');
+    ctx.neg(dst, f);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  'neg(1) = -1': () => {
+    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, '1');
+    ctx.neg(dst, f);
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'neg(-1) = 1': () => {
+    const ctx = new APContext(26), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, '-1');
+    ctx.neg(dst, f);
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'neg preserves exp and limbs': () => {
+    const ctx = new APContext(52), f = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, '1.5');
+    ctx.neg(dst, f);
+    assertEqual(dst[I_EXP], f[I_EXP]);
+    for (let i = 0; i < ctx.numLimbs; i++)
+      assertEqual(dst[HDR + i], f[HDR + i]);
+  },
+
+  'double neg recovers original bits': () => {
+    const ctx = new APContext(52);
+    const f = ctx.alloc(), tmp = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(f, '0.75');
+    ctx.neg(tmp, f);
+    ctx.neg(dst, tmp);
+    assertEqual(dst[I_FLAGS], f[I_FLAGS]);
+    assertEqual(dst[I_EXP],   f[I_EXP]);
+    for (let i = 0; i < ctx.numLimbs; i++)
+      assertEqual(dst[HDR + i], f[HDR + i]);
+  },
+
+  'in-place neg(f, f) works': () => {
+    const ctx = new APContext(26), f = ctx.alloc();
+    ctx.fromString(f, '1');
+    ctx.neg(f, f);
+    assertEqual(ctx.toString(f), '-1');
+  },
+
+}).runTests();
+
+// ─── add ─────────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext add()', {
+
+  // special values
+  'NaN + x = NaN': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, 'NaN'); ctx.fromString(b, '1');
+    ctx.add(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'x + NaN = NaN': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '1'); ctx.fromString(b, 'NaN');
+    ctx.add(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  '+Inf + -Inf = NaN': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, 'Infinity'); ctx.fromString(b, '-Infinity');
+    ctx.add(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  '+Inf + +Inf = +Inf': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, 'Infinity'); ctx.fromString(b, 'Infinity');
+    ctx.add(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  '-Inf + -Inf = -Inf': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '-Infinity'); ctx.fromString(b, '-Infinity');
+    ctx.add(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  '+Inf + normal = +Inf': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, 'Infinity'); ctx.fromString(b, '1');
+    ctx.add(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  '0 + x = x': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '0'); ctx.fromString(b, '4');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '4');
+  },
+
+  'x + 0 = x': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '0');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '4');
+  },
+
+  // same sign, aligned exponents
+  '1 + 1 = 2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '1'); ctx.fromString(b, '1');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  '0.5 + 0.5 = 1 (carry normalization)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '0.5'); ctx.fromString(b, '0.5');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  '0.5 + 0.25 = 0.75': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '0.5'); ctx.fromString(b, '0.25');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '0.75');
+  },
+
+  '-1 + (-1) = -2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '-1'); ctx.fromString(b, '-1');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  // same sign, misaligned exponents
+  '1 + 0.5 = 1.5 (expDiff=1)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '1'); ctx.fromString(b, '0.5');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '1.5');
+  },
+
+  '4 + 2 = 6 (expDiff=1)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '2');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '6');
+  },
+
+  '8 + 2 = 10 (expDiff=2)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '8'); ctx.fromString(b, '2');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '10');
+  },
+
+  // b negligible: iDiff >= numLimbs → early return with a
+  'b negligible at single-limb precision': () => {
+    const ctx = new APContext(26);  // numLimbs = 1
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '67108864');  // 2^26, exp=27; iDiff=1 = numLimbs → negligible
+    ctx.fromString(b, '1');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '67108864');
+  },
+
+  // exercises offset=0, iDiff=1, numLimbs=2 path (covers roundBit branch at line 165-166)
+  '2^26 + 1 at prec=52 (offset=0, iDiff=1)': () => {
+    const ctx = new APContext(52);  // numLimbs = 2
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '67108864');  // 2^26
+    ctx.fromString(b, '1');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '67108865');
+  },
+
+  // different sign: magnitude subtraction
+  '4 + (-2) = 2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '-2');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  '2 + (-4) = -2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '2'); ctx.fromString(b, '-4');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  '4 + (-4) = 0 (exact cancellation)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '-4');
+    ctx.add(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  '-4 + 2 = -2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '-4'); ctx.fromString(b, '2');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  '1 + (-0.5) = 0.5': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '1'); ctx.fromString(b, '-0.5');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '0.5');
+  },
+
+  '4 + (-1) = 3 (borrow propagation)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '-1');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+  // multi-limb precision
+  '2^53 + 1 exact at prec=78': () => {
+    const ctx = new APContext(78);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '9007199254740992'); // 2^53
+    ctx.fromString(b, '1');
+    ctx.add(dst, a, b);
+    assertEqual(ctx.toString(dst), '9007199254740993');
+  },
+
+  // aliasing
+  'dst === a (in-place a += b)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc();
+    ctx.fromString(a, '1'); ctx.fromString(b, '1');
+    ctx.add(a, a, b);
+    assertEqual(ctx.toString(a), '2');
+  },
+
+  'dst === b (in-place b = a + b)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '2');
+    ctx.add(b, a, b);
+    assertEqual(ctx.toString(b), '6');
+  },
+
+}).runTests();
+
+// ─── sub ─────────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext sub()', {
+
+  '4 - 2 = 2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '2');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  '2 - 4 = -2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '2'); ctx.fromString(b, '4');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  '4 - 4 = 0': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '4');
+    ctx.sub(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  '1 - 0 = 1': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '1'); ctx.fromString(b, '0');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  '0 - 1 = -1': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '0'); ctx.fromString(b, '1');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  '-2 - (-4) = 2': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '-2'); ctx.fromString(b, '-4');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  '-4 - 2 = -6': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '-4'); ctx.fromString(b, '2');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '-6');
+  },
+
+  '8 - 0.5 = 7.5 (fractional result)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '8'); ctx.fromString(b, '0.5');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '7.5');
+  },
+
+  '4 - 1 = 3 (borrow propagation)': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '1');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+  'sub(a,b) = neg(sub(b,a))': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc();
+    const r1 = ctx.alloc(), r2 = ctx.alloc(), neg_r1 = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '2');
+    ctx.sub(r1, a, b);       // 4 - 2 = 2
+    ctx.sub(r2, b, a);       // 2 - 4 = -2
+    ctx.neg(neg_r1, r1);     // neg(2) = -2
+    assertEqual(neg_r1[I_FLAGS], r2[I_FLAGS]);
+    assertEqual(neg_r1[I_EXP],   r2[I_EXP]);
+    for (let i = 0; i < ctx.numLimbs; i++)
+      assertEqual(neg_r1[HDR + i], r2[HDR + i]);
+  },
+
+  'dst === b aliasing: b = a - b': () => {
+    const ctx = new APContext(26);
+    const a = ctx.alloc(), b = ctx.alloc();
+    ctx.fromString(a, '4'); ctx.fromString(b, '1');
+    ctx.sub(b, a, b);
+    assertEqual(ctx.toString(b), '3');
+  },
+
+  'large exact subtraction at prec=78': () => {
+    const ctx = new APContext(78);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '9007199254740993'); // 2^53 + 1
+    ctx.fromString(b, '1');
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '9007199254740992');
+  },
+
+  'multi-limb cancellation leaves correct result': () => {
+    const ctx = new APContext(78);
+    const a = ctx.alloc(), b = ctx.alloc(), dst = ctx.alloc();
+    ctx.fromString(a, '9007199254740993'); // 2^53 + 1
+    ctx.fromString(b, '9007199254740992'); // 2^53
+    ctx.sub(dst, a, b);
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+}).runTests();

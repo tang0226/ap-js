@@ -123,6 +123,193 @@ export class APContext {
       dst[I_EXP] -= shift;
     }
   }
+
+  neg(dst, f) {
+    if (f[I_FLAGS] === FLAGS.NAN) { dst[I_FLAGS] = FLAGS.NAN;  return; }
+    dst.set(f);
+    dst[I_FLAGS] ^= 1;
+  }
+
+  add(dst, a, b) {
+    if (isZero(a)) { dst.set(b); return; }
+    if (isZero(b)) { dst.set(a); return; }
+    if (
+      isNaN(a) || isNaN(b) ||
+      (isInf(a) && isInf(b) && ((a[I_FLAGS] ^ b[I_FLAGS]) & 1))
+    ) {
+      dst[I_FLAGS] = FLAGS.NAN;
+      return;
+    }
+
+    if (isInf(a)) { dst[I_FLAGS] = a[I_FLAGS]; return; }
+    if (isInf(b)) { dst[I_FLAGS] = b[I_FLAGS]; return; }
+
+    if (a[I_EXP] < b[I_EXP]) { let temp = a; a = b; b = temp; }
+
+    const expDiff = a[I_EXP] - b[I_EXP];
+    const iDiff = Math.floor(expDiff / LIMB_BITS);
+    if (iDiff >= this.numLimbs) { // b is too small in comparison to a
+      dst.set(a);
+      return;
+    }
+
+    // expDiff = iDiff * LIMB_BITS + offset
+    const offset = expDiff % LIMB_BITS;
+    const invOffset = LIMB_BITS - offset;
+
+    // rounding
+    let roundBit = 0;
+    const lastBLimb = this.numLimbs - 1 - iDiff;
+    if (offset > 0 && lastBLimb >= 0) {
+      roundBit = (b[HDR + lastBLimb] >> (offset - 1)) & 1;
+    } else if (lastBLimb + 1 < this.numLimbs) {
+      roundBit = (b[HDR + lastBLimb + 1] >> (LIMB_BITS - 1)) & 1;
+    }
+
+    // Copy leading limbs of a down to first limb intersecting with b
+    for (let i = 0; i < iDiff; i++) {
+      dst[HDR + i] = a[HDR + i];
+    }
+
+
+    if ((a[I_FLAGS] & 1) === (b[I_FLAGS] & 1)) {
+    // Same sign; add normally
+
+      dst[I_FLAGS] = a[I_FLAGS];
+      dst[I_EXP]   = a[I_EXP];
+
+      let carry = 0;
+
+      // Start adding to all fully-intersecting a limbs
+      for (let i = this.size - 1; i > HDR + iDiff; i--) {
+        dst[i] = a[i] +
+                 (b[i - iDiff] >>> offset) +
+                 ((b[i - iDiff - 1] & ((1 << offset) - 1)) << invOffset) +
+                 carry;
+        if (dst[i] >= LIMB_BASE) {
+          dst[i] -= LIMB_BASE;
+          carry = 1;
+        } else { carry = 0; }
+      }
+
+      // Process left-most intersection
+      dst[HDR + iDiff] = a[HDR + iDiff] + (b[HDR] >>> offset) + carry;
+      if (dst[HDR + iDiff] >= LIMB_BASE) { dst[HDR + iDiff] -= LIMB_BASE; carry = 1; }
+      else { carry = 0; }
+
+      // Apply carry to rest of a's limbs
+      for (let i = HDR + iDiff - 1; i >= HDR; i--) {
+        dst[i] = a[i] + carry;
+        if (dst[i] >= LIMB_BASE) { dst[i] -= LIMB_BASE; carry = 1; } else { carry = 0; }
+      }
+
+      // Add back round bit
+      if (roundBit) {
+        for (let i = this.size - 1; i >= HDR; i--) {
+          dst[i]++;
+          if (dst[i] < LIMB_BASE) break;
+          dst[i] = 0;
+          if (i === HDR) { carry = 1; break; }  // rounding itself caused overflow
+        }
+      }
+
+      if (carry) {
+      // Final carry; shift everything down 1 bit
+        const shiftRound = dst[this.size - 1] & 1; // LSB about to be dropped
+        let bit = dst[HDR] & 1, tempBit;
+        dst[HDR] = (dst[HDR] + LIMB_BASE) >> 1;
+        for (let i = HDR + 1; i < this.size; i++) {
+          tempBit = bit;
+          bit = dst[i] & 1;
+          dst[i] = (-tempBit & (LIMB_BASE >> 1)) + (dst[i] >> 1);
+        }
+        dst[I_EXP]++;
+        
+        // Add back shift round bit
+        if (shiftRound) {
+          for (let i = this.size - 1; i >= HDR; i--) {
+            dst[i]++;
+            if (dst[i] < LIMB_BASE) break;
+            dst[i] = 0;
+            // at this point, all lower limbs have been zeroed out by the carry propagation,
+            // so just set the MSL to 1 and increase the exponent
+            if (i === HDR) { dst[HDR] = LIMB_BASE >> 1; dst[I_EXP]++; break; }
+          }
+        }
+      }
+
+    } else {
+    // Different sign: subtract
+      if (expDiff === 0) {
+      // Ensure a is larger
+        let i;
+        for (i = HDR; i < this.size; i++) {
+          if (a[i] > b[i]) { break; }
+          if (a[i] < b[i]) {
+            let temp = a;  a = b;  b = temp;
+            break;
+          }
+        }
+        if (i === this.size) {
+        // a == b; return 0
+          dst[I_FLAGS] = FLAGS.POS_ZERO;
+          return;
+        }
+      }
+      dst[I_FLAGS] = a[I_FLAGS];
+      dst[I_EXP]   = a[I_EXP];
+
+      let borrow = roundBit;
+
+      // Process all intersecting limbs
+      for (let i = this.size - 1; i > HDR + iDiff; i--) {
+        dst[i] = a[i] -
+                 (b[i - iDiff] >>> offset) -
+                 ((b[i - iDiff - 1] & ((1 << offset) - 1)) << invOffset) -
+                 borrow;
+        if (dst[i] < 0) {
+          dst[i] += LIMB_BASE;
+          borrow = 1;
+        } else { borrow = 0; }
+      }
+
+      // Process left-most intersection / final borrow
+      dst[HDR + iDiff] = a[HDR + iDiff] - (b[HDR] >>> offset) - borrow;
+      let i = HDR + iDiff;
+      while (dst[i] < 0) {
+        dst[i] += LIMB_BASE;
+        dst[i - 1]--;
+        borrow = 1;
+        i--;
+        dst[i] = a[i] - borrow;
+      }
+
+      // Shift out leading zeroes
+      i = HDR;
+      let shiftI = 0, shiftOffset = 0;
+      while (i < this.size && dst[i] === 0) { shiftI++;  i++; }
+      let r = dst[i];
+      while (r < (LIMB_BASE >> 1)) { shiftOffset++;  r <<= 1; }
+      const invShiftOffset = LIMB_BITS - shiftOffset;
+      for (i = HDR; i < this.size - shiftI - 1; i++) {
+        dst[i] = ((dst[i + shiftI] << shiftOffset) & LIMB_MASK) + (dst[i + shiftI + 1] >>> invShiftOffset);
+      }
+      dst[this.size - shiftI - 1] = (dst[this.size - 1] << shiftOffset) & LIMB_MASK;
+      i++;
+      // Clear out rest of limbs after shifting
+      for (; i < this.size; i++) {
+        dst[i] = 0;
+      }
+      // Update exponent based on zero-shifting
+      dst[I_EXP] -= shiftI * LIMB_BITS + shiftOffset;
+    }
+  }
+
+  sub(dst, a, b) {
+    b[I_FLAGS] ^= 1;
+    this.add(dst, a, b);
+    if (dst !== b) b[I_FLAGS] ^= 1;
+  }
 }
 
 // Converts a non-negative BigInt into the flat-array float format.
@@ -233,4 +420,7 @@ function _toBaseStr(mantissa, shift, bitsPerDigit, prefix) {
   return prefix + intPart.toString(radix) + '.' + fracStr;
 }
 
-export { FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS, LIMB_BASE, LIMB_MASK, isNeg, isNormal, isZero, isInf, isNaN };
+export {
+  FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS, LIMB_BASE, LIMB_MASK,
+  isNeg, isNormal, isZero, isInf, isNaN
+};

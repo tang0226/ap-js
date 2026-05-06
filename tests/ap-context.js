@@ -7,18 +7,18 @@ import { APContext, FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS } from '../ap.
 new TestSuite('APContext constructor', {
 
   'sets prec': () => {
-    assertEqual(new APContext(26).prec, 26);
+    assertEqual(new APContext(16).prec, 16);
     assertEqual(new APContext(128).prec, 128);
   },
 
   'computes numLimbs': () => {
-    assertEqual(new APContext(26).numLimbs, 1);
-    assertEqual(new APContext(52).numLimbs, 2);
+    assertEqual(new APContext(16).numLimbs, 1);
+    assertEqual(new APContext(32).numLimbs, 2);
     assertEqual(new APContext(128).numLimbs, Math.ceil(128 / LIMB_BITS));
   },
 
   'computes size as HDR + numLimbs': () => {
-    const ctx = new APContext(52);
+    const ctx = new APContext(32);
     assertEqual(ctx.size, HDR + ctx.numLimbs);
   },
 
@@ -28,17 +28,17 @@ new TestSuite('APContext constructor', {
 
 new TestSuite('APContext alloc()', {
 
-  'returns Float64Array': () => {
-    assertInstance(new APContext(26).alloc(), Float64Array);
+  'returns Int32Array': () => {
+    assertInstance(new APContext(16).alloc(), Int32Array);
   },
 
   'length matches context size': () => {
-    const ctx = new APContext(52);
+    const ctx = new APContext(32);
     assertEqual(ctx.alloc().length, ctx.size);
   },
 
   'initializes to POS_ZERO': () => {
-    assertEqual(new APContext(26).alloc()[I_FLAGS], FLAGS.POS_ZERO);
+    assertEqual(new APContext(16).alloc()[I_FLAGS], FLAGS.POS_ZERO);
   },
 
   'sets prec header': () => {
@@ -47,12 +47,12 @@ new TestSuite('APContext alloc()', {
   },
 
   'sets exp to 0': () => {
-    assertEqual(new APContext(26).alloc()[I_EXP], 0);
+    assertEqual(new APContext(16).alloc()[I_EXP], 0);
   },
 
   // input variants
   'alloc(string) parses value': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const f = ctx.alloc('1'), g = ctx.alloc();
     ctx.fromString(g, '1');
     assertEqual(f[I_FLAGS], g[I_FLAGS]);
@@ -61,7 +61,7 @@ new TestSuite('APContext alloc()', {
   },
 
   'alloc(number) parses value': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const f = ctx.alloc(4), g = ctx.alloc();
     ctx.fromString(g, '4');
     assertEqual(f[I_FLAGS], g[I_FLAGS]);
@@ -69,28 +69,28 @@ new TestSuite('APContext alloc()', {
     assertEqual(f[HDR],     g[HDR]);
   },
 
-  'alloc(Float64Array) copies all elements': () => {
-    const ctx = new APContext(52);
+  'alloc(Int32Array) copies all elements': () => {
+    const ctx = new APContext(32);
     const src = ctx.alloc('1.5'), copy = ctx.alloc(src);
     for (let i = 0; i < ctx.size; i++)
       assertEqual(copy[i], src[i]);
   },
 
-  'alloc(Float64Array) returns a new array': () => {
-    const ctx = new APContext(26);
+  'alloc(Int32Array) returns a new array': () => {
+    const ctx = new APContext(16);
     const src = ctx.alloc('1'), copy = ctx.alloc(src);
     assertNotEqual(copy, src);
   },
 
-  'alloc(wrong-size Float64Array) throws RangeError': () => {
-    const ctx26 = new APContext(26), ctx52 = new APContext(52);
-    assertThrows(() => ctx26.alloc(ctx52.alloc('1')), 'source array size mismatch');
+  'alloc(wrong-size Int32Array) throws RangeError': () => {
+    const ctx16 = new APContext(16), ctx32 = new APContext(32);
+    assertThrows(() => ctx16.alloc(ctx32.alloc('1')), 'source array size mismatch');
   },
 
   'ap() is an alias for alloc()': () => {
-    const ctx = new APContext(52);
+    const ctx = new APContext(32);
     assertEqual(ctx.ap, ctx.alloc);
-    assertInstance(ctx.ap(), Float64Array);
+    assertInstance(ctx.ap(), Int32Array);
     assertEqual(ctx.ap().length, ctx.size);
   },
 
@@ -102,63 +102,63 @@ new TestSuite('APContext fromString()', {
 
   // special values
   '"NaN"': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, 'NaN');
     assertEqual(f[I_FLAGS], FLAGS.NAN);
   },
 
   '"nan" (lowercase)': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, 'nan');
     assertEqual(f[I_FLAGS], FLAGS.NAN);
   },
 
   '"Infinity"': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, 'Infinity');
     assertEqual(f[I_FLAGS], FLAGS.POS_INF);
   },
 
   '"+inf"': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '+inf');
     assertEqual(f[I_FLAGS], FLAGS.POS_INF);
   },
 
   '"-Infinity"': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-Infinity');
     assertEqual(f[I_FLAGS], FLAGS.NEG_INF);
   },
 
   '"-inf"': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-inf');
     assertEqual(f[I_FLAGS], FLAGS.NEG_INF);
   },
 
   // zero
   '"0" is POS_ZERO': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0');
     assertEqual(f[I_FLAGS], FLAGS.POS_ZERO);
     assertEqual(f[I_EXP], 0);
   },
 
   '"-0" is NEG_ZERO': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-0');
     assertEqual(f[I_FLAGS], FLAGS.NEG_ZERO);
   },
 
   '"0.0" is zero': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.0');
     assertEqual(f[I_FLAGS], FLAGS.POS_ZERO);
   },
 
   '"0e10" is zero': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0e10');
     assertEqual(f[I_FLAGS], FLAGS.POS_ZERO);
   },
@@ -166,8 +166,9 @@ new TestSuite('APContext fromString()', {
   // integer normalization
   // value = mantissa_int * 2^(exp - prec), mantissa_int always in [2^(prec-1), 2^prec)
   // For any power-of-two 2^k: mantissa = 2^(prec-1), exp = k+1
+  // Use prec=LIMB_BITS so the full mantissa fits in one limb: f[HDR] = 2^(LIMB_BITS-1)
   '"1": flags, exp, mantissa': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(LIMB_BITS), f = ctx.alloc();
     ctx.fromString(f, '1');
     assertEqual(f[I_FLAGS], FLAGS.POS_NORMAL);
     assertEqual(f[I_EXP], 1);
@@ -175,14 +176,14 @@ new TestSuite('APContext fromString()', {
   },
 
   '"2": exp increments, mantissa unchanged': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(LIMB_BITS), f = ctx.alloc();
     ctx.fromString(f, '2');
     assertEqual(f[I_EXP], 2);
     assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
   },
 
   '"4": exp increments again': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(LIMB_BITS), f = ctx.alloc();
     ctx.fromString(f, '4');
     assertEqual(f[I_EXP], 3);
     assertEqual(f[HDR], 1 << (LIMB_BITS - 1));
@@ -190,7 +191,7 @@ new TestSuite('APContext fromString()', {
 
   // negative
   '"-1": NEG_NORMAL, same mantissa/exp as "1"': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(LIMB_BITS), f = ctx.alloc();
     ctx.fromString(f, '-1');
     assertEqual(f[I_FLAGS], FLAGS.NEG_NORMAL);
     assertEqual(f[I_EXP], 1);
@@ -199,7 +200,7 @@ new TestSuite('APContext fromString()', {
 
   // fractions: 0.5 = 2^-1 → exp=0, 0.25 = 2^-2 → exp=-1
   '"0.5": exp=0, mantissa=2^(prec-1)': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(LIMB_BITS), f = ctx.alloc();
     ctx.fromString(f, '0.5');
     assertEqual(f[I_FLAGS], FLAGS.POS_NORMAL);
     assertEqual(f[I_EXP], 0);
@@ -207,7 +208,7 @@ new TestSuite('APContext fromString()', {
   },
 
   '"0.25": exp=-1': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(LIMB_BITS), f = ctx.alloc();
     ctx.fromString(f, '0.25');
     assertEqual(f[I_FLAGS], FLAGS.POS_NORMAL);
     assertEqual(f[I_EXP], -1);
@@ -216,7 +217,7 @@ new TestSuite('APContext fromString()', {
 
   // scientific notation
   '"1e1" matches "10"': () => {
-    const ctx = new APContext(52);
+    const ctx = new APContext(32);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '1e1');
     ctx.fromString(b, '10');
@@ -226,7 +227,7 @@ new TestSuite('APContext fromString()', {
   },
 
   '"1.5e2" matches "150"': () => {
-    const ctx = new APContext(52);
+    const ctx = new APContext(32);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '1.5e2');
     ctx.fromString(b, '150');
@@ -236,7 +237,7 @@ new TestSuite('APContext fromString()', {
   },
 
   '"1.5e-1" matches "0.15"': () => {
-    const ctx = new APContext(52);
+    const ctx = new APContext(32);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '1.5e-1');
     ctx.fromString(b, '0.15');
@@ -247,7 +248,7 @@ new TestSuite('APContext fromString()', {
 
   // non-decimal bases
   '"0xff" matches "255"': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '0xff');
     ctx.fromString(b, '255');
@@ -256,7 +257,7 @@ new TestSuite('APContext fromString()', {
   },
 
   '"0b11111111" matches "255"': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '0b11111111');
     ctx.fromString(b, '255');
@@ -265,14 +266,14 @@ new TestSuite('APContext fromString()', {
   },
 
   '"-0xff" is NEG_NORMAL': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-0xff');
     assertEqual(f[I_FLAGS], FLAGS.NEG_NORMAL);
   },
 
   // whitespace
   'trims leading/trailing whitespace': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '  1  ');
     ctx.fromString(b, '1');
@@ -288,105 +289,105 @@ new TestSuite('APContext toString()', {
 
   // special values
   'NaN': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, 'NaN');
     assertEqual(ctx.toString(f), 'NaN');
   },
 
   'Infinity': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, 'Infinity');
     assertEqual(ctx.toString(f), 'Infinity');
   },
 
   '-Infinity': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-Infinity');
     assertEqual(ctx.toString(f), '-Infinity');
   },
 
   '+0': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0');
     assertEqual(ctx.toString(f), '0');
   },
 
   '-0': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-0');
     assertEqual(ctx.toString(f), '-0');
   },
 
   // decimal — exact binary values only (powers of 2 round-trip cleanly)
   '"1" dec': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '1');
     assertEqual(ctx.toString(f), '1');
   },
 
   '"-1" dec': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-1');
     assertEqual(ctx.toString(f), '-1');
   },
 
   '"2" dec': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '2');
     assertEqual(ctx.toString(f), '2');
   },
 
   '"0.5" dec': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.5');
     assertEqual(ctx.toString(f), '0.5');
   },
 
   '"0.25" dec': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.25');
     assertEqual(ctx.toString(f), '0.25');
   },
 
   '"0.125" dec': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.125');
     assertEqual(ctx.toString(f), '0.125');
   },
 
   'default format matches "dec"': () => {
-    const ctx = new APContext(52), f = ctx.alloc();
+    const ctx = new APContext(32), f = ctx.alloc();
     ctx.fromString(f, '0.5');
     assertEqual(ctx.toString(f), ctx.toString(f, 'dec'));
   },
 
   // scientific notation
   '"1" sci': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '1');
     assertEqual(ctx.toString(f, 'e'), '1e+00');
   },
 
   '"2" sci': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '2');
     assertEqual(ctx.toString(f, 'e'), '2e+00');
   },
 
   '"0.5" sci': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.5');
     assertEqual(ctx.toString(f, 'e'), '5e-01');
   },
 
   '"0.25" sci': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.25');
     assertEqual(ctx.toString(f, 'e'), '2.5e-01');
   },
 
   'sci format structure': () => {
-    const ctx = new APContext(52), f = ctx.alloc();
+    const ctx = new APContext(32), f = ctx.alloc();
     ctx.fromString(f, '1234.5');
     const s = ctx.toString(f, 'e');
     assert(/^-?\d(\.\d+)?e[+-]\d{2,}$/.test(s), `sci format invalid: ${s}`);
@@ -394,69 +395,69 @@ new TestSuite('APContext toString()', {
 
   // binary
   '"1" bin': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '1');
     assertEqual(ctx.toString(f, 'b'), '0b1');
   },
 
   '"2" bin': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '2');
     assertEqual(ctx.toString(f, 'b'), '0b10');
   },
 
   '"3" bin': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '3');
     assertEqual(ctx.toString(f, 'b'), '0b11');
   },
 
   '"0.5" bin': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.5');
     assertEqual(ctx.toString(f, 'b'), '0b0.1');
   },
 
   '"-2" bin': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '-2');
     assertEqual(ctx.toString(f, 'b'), '-0b10');
   },
 
   // hex
   '"255" hex': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '255');
     assertEqual(ctx.toString(f, 'x'), '0xff');
   },
 
   '"16" hex': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '16');
     assertEqual(ctx.toString(f, 'x'), '0x10');
   },
 
   '"0.5" hex': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.5');
     assertEqual(ctx.toString(f, 'x'), '0x0.8');
   },
 
   '"0.25" hex': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '0.25');
     assertEqual(ctx.toString(f, 'x'), '0x0.4');
   },
 
   // octal
   '"8" oct': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '8');
     assertEqual(ctx.toString(f, 'o'), '0o10');
   },
 
   '"64" oct': () => {
-    const ctx = new APContext(26), f = ctx.alloc();
+    const ctx = new APContext(16), f = ctx.alloc();
     ctx.fromString(f, '64');
     assertEqual(ctx.toString(f, 'o'), '0o100');
   },
@@ -482,8 +483,8 @@ new TestSuite('APContext precision', {
     assertEqual(ctx.toString(f), '9007199254740992');
   },
 
-  // A 128-bit number uses 5 limbs. If precision is real, limbs 1-4 must be non-zero
-  // for a value whose binary expansion doesn't terminate after 26 bits.
+  // A 128-bit number uses ceil(128/LIMB_BITS) limbs. If precision is real, multiple
+  // limbs must be non-zero for a value whose binary expansion doesn't terminate after LIMB_BITS bits.
   'multiple limbs carry non-zero data': () => {
     const ctx = new APContext(128), f = ctx.alloc();
     ctx.fromString(f, '1.23456789012345678901234567890123456789');
@@ -577,7 +578,7 @@ new TestSuite('APContext inverse', {
 
   // Consistency check carried over from earlier toString tests.
   '0xff round-trip via dec': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.alloc(), b = ctx.alloc();
     ctx.fromString(a, '0xff');
     ctx.fromString(b, ctx.toString(a, 'dec'));
@@ -592,49 +593,49 @@ new TestSuite('APContext inverse', {
 new TestSuite('APContext neg()', {
 
   'neg(NaN) = NaN': () => {
-    const ctx = new APContext(26), f = ctx.ap('NaN'), dst = ctx.ap();
+    const ctx = new APContext(16), f = ctx.ap('NaN'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
   },
 
   'neg(+0) = -0': () => {
-    const ctx = new APContext(26), f = ctx.ap('0'), dst = ctx.ap();
+    const ctx = new APContext(16), f = ctx.ap('0'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
   },
 
   'neg(-0) = +0': () => {
-    const ctx = new APContext(26), f = ctx.ap('-0'), dst = ctx.ap();
+    const ctx = new APContext(16), f = ctx.ap('-0'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
   },
 
   'neg(+Inf) = -Inf': () => {
-    const ctx = new APContext(26), f = ctx.ap('Infinity'), dst = ctx.ap();
+    const ctx = new APContext(16), f = ctx.ap('Infinity'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
   },
 
   'neg(-Inf) = +Inf': () => {
-    const ctx = new APContext(26), f = ctx.ap('-Infinity'), dst = ctx.ap();
+    const ctx = new APContext(16), f = ctx.ap('-Infinity'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
   },
 
   'neg(1) = -1': () => {
-    const ctx = new APContext(26), f = ctx.ap('1'), dst = ctx.ap();
+    const ctx = new APContext(16), f = ctx.ap('1'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(ctx.toString(dst), '-1');
   },
 
   'neg(-1) = 1': () => {
-    const ctx = new APContext(26), f = ctx.ap('-1'), dst = ctx.ap();
+    const ctx = new APContext(16), f = ctx.ap('-1'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(ctx.toString(dst), '1');
   },
 
   'neg preserves exp and limbs': () => {
-    const ctx = new APContext(52), f = ctx.ap('1.5'), dst = ctx.ap();
+    const ctx = new APContext(32), f = ctx.ap('1.5'), dst = ctx.ap();
     ctx.neg(dst, f);
     assertEqual(dst[I_EXP], f[I_EXP]);
     for (let i = 0; i < ctx.numLimbs; i++)
@@ -642,7 +643,7 @@ new TestSuite('APContext neg()', {
   },
 
   'double neg recovers original bits': () => {
-    const ctx = new APContext(52);
+    const ctx = new APContext(32);
     const f = ctx.ap('0.75'), tmp = ctx.ap(), dst = ctx.ap();
     ctx.neg(tmp, f);
     ctx.neg(dst, tmp);
@@ -653,7 +654,7 @@ new TestSuite('APContext neg()', {
   },
 
   'in-place neg(f, f) works': () => {
-    const ctx = new APContext(26), f = ctx.ap('1');
+    const ctx = new APContext(16), f = ctx.ap('1');
     ctx.neg(f, f);
     assertEqual(ctx.toString(f), '-1');
   },
@@ -666,56 +667,56 @@ new TestSuite('APContext add()', {
 
   // special values
   'NaN + x = NaN': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('NaN'), b = ctx.ap('1'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
   },
 
   'x + NaN = NaN': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('1'), b = ctx.ap('NaN'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
   },
 
   '+Inf + -Inf = NaN': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('Infinity'), b = ctx.ap('-Infinity'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NAN);
   },
 
   '+Inf + +Inf = +Inf': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('Infinity'), b = ctx.ap('Infinity'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
   },
 
   '-Inf + -Inf = -Inf': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('-Infinity'), b = ctx.ap('-Infinity'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
   },
 
   '+Inf + normal = +Inf': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('Infinity'), b = ctx.ap('1'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
   },
 
   '0 + x = x': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('0'), b = ctx.ap('4'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '4');
   },
 
   'x + 0 = x': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('0'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '4');
@@ -723,28 +724,28 @@ new TestSuite('APContext add()', {
 
   // same sign, aligned exponents
   '1 + 1 = 2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('1'), b = ctx.ap('1'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
   },
 
   '0.5 + 0.5 = 1 (carry normalization)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('0.5'), b = ctx.ap('0.5'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '1');
   },
 
   '0.5 + 0.25 = 0.75': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('0.5'), b = ctx.ap('0.25'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '0.75');
   },
 
   '-1 + (-1) = -2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('-1'), b = ctx.ap('-1'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
@@ -752,21 +753,21 @@ new TestSuite('APContext add()', {
 
   // same sign, misaligned exponents
   '1 + 0.5 = 1.5 (expDiff=1)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('1'), b = ctx.ap('0.5'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '1.5');
   },
 
   '4 + 2 = 6 (expDiff=1)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('2'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '6');
   },
 
   '8 + 2 = 10 (expDiff=2)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('8'), b = ctx.ap('2'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '10');
@@ -774,58 +775,58 @@ new TestSuite('APContext add()', {
 
   // b negligible: iDiff >= numLimbs → early return with a
   'b negligible at single-limb precision': () => {
-    const ctx = new APContext(26);  // numLimbs = 1
-    const a = ctx.ap('67108864'), b = ctx.ap('1'), dst = ctx.ap();  // 2^26, iDiff=1 = numLimbs
+    const ctx = new APContext(LIMB_BITS);  // numLimbs = 1
+    const a = ctx.ap('65536'), b = ctx.ap('1'), dst = ctx.ap();  // 2^16, expDiff=16, iDiff=1 = numLimbs
     ctx.add(dst, a, b);
-    assertEqual(ctx.toString(dst), '67108864');
+    assertEqual(ctx.toString(dst), '65536');
   },
 
-  // exercises offset=0, iDiff=1, numLimbs=2 path (covers roundBit branch at line 165-166)
-  '2^26 + 1 at prec=52 (offset=0, iDiff=1)': () => {
-    const ctx = new APContext(52);  // numLimbs = 2
-    const a = ctx.ap('67108864'), b = ctx.ap('1'), dst = ctx.ap();
+  // exercises offset=0, iDiff=1, numLimbs=2 path (covers roundBit branch)
+  '2^LIMB_BITS + 1 at prec=2*LIMB_BITS (offset=0, iDiff=1)': () => {
+    const ctx = new APContext(2 * LIMB_BITS);  // numLimbs = 2
+    const a = ctx.ap('65536'), b = ctx.ap('1'), dst = ctx.ap();  // expDiff=16, iDiff=1, offset=0
     ctx.add(dst, a, b);
-    assertEqual(ctx.toString(dst), '67108865');
+    assertEqual(ctx.toString(dst), '65537');
   },
 
   // different sign: magnitude subtraction
   '4 + (-2) = 2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('-2'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
   },
 
   '2 + (-4) = -2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('2'), b = ctx.ap('-4'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
   },
 
   '4 + (-4) = 0 (exact cancellation)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('-4'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
   },
 
   '-4 + 2 = -2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('-4'), b = ctx.ap('2'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
   },
 
   '1 + (-0.5) = 0.5': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('1'), b = ctx.ap('-0.5'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '0.5');
   },
 
   '4 + (-1) = 3 (borrow propagation)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('-1'), dst = ctx.ap();
     ctx.add(dst, a, b);
     assertEqual(ctx.toString(dst), '3');
@@ -841,14 +842,14 @@ new TestSuite('APContext add()', {
 
   // aliasing
   'dst === a (in-place a += b)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('1'), b = ctx.ap('1');
     ctx.add(a, a, b);
     assertEqual(ctx.toString(a), '2');
   },
 
   'dst === b (in-place b = a + b)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('2');
     ctx.add(b, a, b);
     assertEqual(ctx.toString(b), '6');
@@ -861,70 +862,70 @@ new TestSuite('APContext add()', {
 new TestSuite('APContext sub()', {
 
   '4 - 2 = 2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('2'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
   },
 
   '2 - 4 = -2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('2'), b = ctx.ap('4'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '-2');
   },
 
   '4 - 4 = 0': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('4'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
   },
 
   '1 - 0 = 1': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('1'), b = ctx.ap('0'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '1');
   },
 
   '0 - 1 = -1': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('0'), b = ctx.ap('1'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '-1');
   },
 
   '-2 - (-4) = 2': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('-2'), b = ctx.ap('-4'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '2');
   },
 
   '-4 - 2 = -6': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('-4'), b = ctx.ap('2'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '-6');
   },
 
   '8 - 0.5 = 7.5 (fractional result)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('8'), b = ctx.ap('0.5'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '7.5');
   },
 
   '4 - 1 = 3 (borrow propagation)': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('1'), dst = ctx.ap();
     ctx.sub(dst, a, b);
     assertEqual(ctx.toString(dst), '3');
   },
 
   'sub(a,b) = neg(sub(b,a))': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('2');
     const r1 = ctx.ap(), r2 = ctx.ap(), neg_r1 = ctx.ap();
     ctx.sub(r1, a, b);
@@ -937,7 +938,7 @@ new TestSuite('APContext sub()', {
   },
 
   'dst === b aliasing: b = a - b': () => {
-    const ctx = new APContext(26);
+    const ctx = new APContext(16);
     const a = ctx.ap('4'), b = ctx.ap('1');
     ctx.sub(b, a, b);
     assertEqual(ctx.toString(b), '3');

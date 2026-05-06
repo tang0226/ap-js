@@ -1,4 +1,4 @@
-const LIMB_BITS = 26;
+const LIMB_BITS = 16;
 const LIMB_BASE = 1 << LIMB_BITS;
 const LIMB_MASK = (1 << LIMB_BITS) - 1;
 
@@ -33,7 +33,7 @@ export class APContext {
   }
 
   alloc(input) {
-    const f = new Float64Array(this.size);
+    const f = new Int32Array(this.size);
     f[I_PREC]  = this.prec;
     f[I_FLAGS] = FLAGS.POS_ZERO;
     f[I_EXP]   = 0;
@@ -41,7 +41,7 @@ export class APContext {
       this.fromString(f, input);
     } else if (typeof input === 'number') {
       this.fromString(f, input.toString());
-    } else if (input instanceof Float64Array) {
+    } else if (input instanceof Int32Array) {
       if (input.length !== this.size) throw new RangeError('source array size mismatch');
       f.set(input);
     }

@@ -318,6 +318,104 @@ export class APContext {
     this.add(dst, a, b);
     if (dst !== b) b[I_FLAGS] ^= 1;
   }
+
+  mulLong(dst, a, b) {
+    // if any operand is also the destination, copy it first
+    if (dst === a) { a = this.alloc(); a.set(dst); }
+    if (dst === b) { b = this.alloc(); b.set(dst); }
+
+    let aInf = isInf(a), bInf = isInf(b), aZero = isZero(a), bZero = isZero(b);
+
+    if (isNaN(a) || isNaN(b) || (aZero && bInf) || (bZero && aInf)) {
+      dst[I_FLAGS] = FLAGS.NAN;
+      return;
+    }
+
+    let diffSign = (a[I_FLAGS] & 1) ^ (b[I_FLAGS] & 1);
+
+    if (aZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
+    if (bZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
+    if (aInf && !bInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
+    if (bInf && !aInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
+    if (aInf && bInf) {
+      dst[I_FLAGS] = FLAGS.POS_INF + diffSign;
+      return;
+    }
+
+
+    dst[I_EXP] = a[I_EXP] + b[I_EXP] - LIMB_BITS;
+    dst[I_FLAGS] = FLAGS.POS_NORMAL;
+    if (((a[I_FLAGS] & 1) ^ (b[I_FLAGS] & 1))) dst[I_FLAGS] = FLAGS.NEG_NORMAL;
+
+    // Start by calculating an extra limb (numLimbs + 1)
+    let carry = 0;
+    let rem = 0;
+    let term;
+
+    for (let i = 1; i < this.numLimbs; i++) {
+      term = a[HDR + i] * b[this.size - i];
+      carry += term >>> LIMB_BITS;
+      rem += term & LIMB_MASK;
+    }
+    carry += rem >>> LIMB_BITS;
+    rem &= LIMB_MASK;
+
+    // Set smallest result limb to (initial carry + round bit)
+    dst[this.size - 1] = carry + (rem >>> (LIMB_BITS - 1));
+
+    // Main limb computations
+    let n = this.numLimbs;
+    for (let i = this.size - 1; i > HDR; i--, n--) {
+      carry = 0;
+      for (let j = 0; j < n; j++) {
+        term = a[HDR + j] * b[i - j];
+        carry += term >>> LIMB_BITS;
+        dst[i] += term & LIMB_MASK;
+      }
+      dst[i - 1] = carry + (dst[i] >>> LIMB_BITS); // Carry into previous limb
+      dst[i] &= LIMB_MASK;
+    }
+
+    // First limb
+    term = a[HDR] * b[HDR];
+    dst[HDR] += term & LIMB_MASK;
+    carry = (term >>> LIMB_BITS) + (dst[HDR] >>> LIMB_BITS);
+    dst[HDR] &= LIMB_MASK;
+    
+
+    if (!carry) return;
+
+    // Shift all limbs down to accomodate carry
+    let offset = 1;
+    let c = carry;
+    while (c >>>= 1) {
+      offset++;
+    }
+
+    dst[I_EXP] += offset;
+
+    let mask = (1 << offset) - 1,
+        invOffset = LIMB_BITS - offset,
+        shiftIn = carry,
+        tmp;
+    
+    for (let i = HDR; i < this.size; i++) {
+      tmp = shiftIn;
+      shiftIn = dst[i] & mask;
+      dst[i] >>>= offset;
+      dst[i] += (tmp << invOffset);
+    }
+    
+    let roundBit = shiftIn >>> (offset - 1);
+    if (roundBit) {
+      let i = this.size - 1;
+      dst[i]++;
+      while (dst[i] >= LIMB_BASE) {
+        dst[i] -= LIMB_BASE;
+        dst[--i]++;
+      }
+    }
+  }
 }
 
 // Alias

@@ -959,3 +959,211 @@ new TestSuite('APContext sub()', {
   },
 
 }).runTests();
+
+// ─── mulLong ─────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext mulLong()', {
+
+  // special values
+  'NaN × x = NaN': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('NaN'), b = ctx.ap('1'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'x × NaN = NaN': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('1'), b = ctx.ap('NaN'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  '0 × Inf = NaN': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('0'), b = ctx.ap('Infinity'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'Inf × 0 = NaN': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('Infinity'), b = ctx.ap('0'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  '+0 × x = +0': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('0'), b = ctx.ap('5'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  '-0 × x = -0': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('-0'), b = ctx.ap('5'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  '+0 × (-x) = -0': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('0'), b = ctx.ap('-5'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  '+Inf × x = +Inf': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('Infinity'), b = ctx.ap('5'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  '+Inf × (-x) = -Inf': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('Infinity'), b = ctx.ap('-5'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  '-Inf × (-x) = +Inf': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('-Infinity'), b = ctx.ap('-5'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  '+Inf × +Inf = +Inf': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('Infinity'), b = ctx.ap('Infinity'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  '+Inf × -Inf = -Inf': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('Infinity'), b = ctx.ap('-Infinity'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  // basic arithmetic at prec=16 (single limb)
+  '1 × 1 = 1': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('1'), b = ctx.ap('1'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  '2 × 3 = 6': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('2'), b = ctx.ap('3'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '6');
+  },
+
+  '0.5 × 0.5 = 0.25': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('0.5'), b = ctx.ap('0.5'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '0.25');
+  },
+
+  '4 × 0.25 = 1': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('4'), b = ctx.ap('0.25'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  // sign propagation
+  '2 × (-3) = -6': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('2'), b = ctx.ap('-3'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '-6');
+  },
+
+  '(-2) × (-3) = 6': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('-2'), b = ctx.ap('-3'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '6');
+  },
+
+  // aliasing
+  'dst === a': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('2'), b = ctx.ap('3');
+    ctx.mulLong(a, a, b);
+    assertEqual(ctx.toString(a), '6');
+  },
+
+  'dst === b': () => {
+    const ctx = new APContext(16);
+    const a = ctx.ap('2'), b = ctx.ap('3');
+    ctx.mulLong(b, a, b);
+    assertEqual(ctx.toString(b), '6');
+  },
+
+  // multi-limb: prec=32
+  '4 × 4 = 16 at prec=32': () => {
+    const ctx = new APContext(32);
+    const a = ctx.ap('4'), b = ctx.ap('4'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '16');
+  },
+
+  '256 × 256 = 65536 at prec=32': () => {
+    const ctx = new APContext(32);
+    const a = ctx.ap('256'), b = ctx.ap('256'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '65536');
+  },
+
+  // prec=64
+  '65536 × 65536 = 4294967296 at prec=64': () => {
+    const ctx = new APContext(64);
+    const a = ctx.ap('65536'), b = ctx.ap('65536'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '4294967296');
+  },
+
+  '1000 × 1000 = 1000000 at prec=64': () => {
+    const ctx = new APContext(64);
+    const a = ctx.ap('1000'), b = ctx.ap('1000'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '1000000');
+  },
+
+  // prec=128: beyond float64 safe-integer range
+  '(2^53+1) × 2 at prec=128': () => {
+    const ctx = new APContext(128);
+    const a = ctx.ap('9007199254740993'), b = ctx.ap('2'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '18014398509481986');
+  },
+
+  // prec=256: multi-limb with large irregular values
+  '3957 × 3486792 at prec=256': () => {
+    const ctx = new APContext(256);
+    const a = ctx.ap('3957'), b = ctx.ap('3486792'), dst = ctx.ap();
+    ctx.mulLong(dst, a, b);
+    assertEqual(ctx.toString(dst), '13797235944');
+  },
+
+  // rounding: 257×257 = 66049, which is a 17-bit integer; at prec=16 it must round.
+  // The round bit is set (66049 is equidistant from 66048 and 66050) → rounds to 66050.
+  // At prec=64 all 17 bits fit, so the exact value 66049 is preserved.
+  'rounds 17-bit product at prec=16, exact at prec=64': () => {
+    const ctx16 = new APContext(16), ctx64 = new APContext(64);
+    const dst16 = ctx16.ap(), dst64 = ctx64.ap();
+    ctx16.mulLong(dst16, ctx16.ap('257'), ctx16.ap('257'));
+    ctx64.mulLong(dst64, ctx64.ap('257'), ctx64.ap('257'));
+    assertEqual(ctx64.toString(dst64), '66049');
+    assertEqual(ctx16.toString(dst16), '66050');
+  },
+
+}).runTests();

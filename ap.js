@@ -34,438 +34,437 @@ export class APContext {
     // Constants
     this.n2 = this.alloc(2);
   }
+}
 
-  alloc(input) {
-    const f = new Int32Array(this.size);
-    f[I_PREC]  = this.prec;
-    f[I_FLAGS] = FLAGS.POS_ZERO;
-    f[I_EXP]   = 0;
-    if (typeof input === 'string') {
-      this.fromString(f, input);
-    } else if (typeof input === 'number') {
-      this.fromString(f, input.toString());
-    } else if (input instanceof Int32Array) {
-      if (input.length !== this.size) throw new RangeError('source array size mismatch');
-      f.set(input);
-    }
-    return f;
+APContext.prototype.alloc =
+APContext.prototype.ap = function(input) {
+  const f = new Int32Array(this.size);
+  f[I_PREC]  = this.prec;
+  f[I_FLAGS] = FLAGS.POS_ZERO;
+  f[I_EXP]   = 0;
+  if (typeof input === 'string') {
+    this.fromString(f, input);
+  } else if (typeof input === 'number') {
+    this.fromString(f, input.toString());
+  } else if (input instanceof Int32Array) {
+    if (input.length !== this.size) throw new RangeError('source array size mismatch');
+    f.set(input);
+  }
+  return f;
+};
+
+APContext.prototype.toString = function(f, format = '', sigFigs = null) {
+  if (typeof format === 'number') { sigFigs = format; }
+
+  if (f[I_FLAGS] === FLAGS.NAN)     return 'NaN';
+  if (f[I_FLAGS] === FLAGS.POS_INF) return 'Infinity';
+  if (f[I_FLAGS] === FLAGS.NEG_INF) return '-Infinity';
+  if (f[I_FLAGS] <= 1)              return (f[I_FLAGS] & 1) ? '-0' : '0';
+
+  const sign = (f[I_FLAGS] & 1) ? '-' : '';
+  const exp  = f[I_EXP] | 0;
+
+  // Reconstruct mantissa as BigInt from big-endian limbs
+  let mantissa = 0n;
+  const lbits  = BigInt(LIMB_BITS);
+  for (let i = 0; i < this.numLimbs; i++)
+    mantissa = (mantissa << lbits) | BigInt(f[HDR + i]);
+
+  // value = mantissa * 2^shift
+  const shift = exp - this.prec;
+
+  switch (format) {
+    case 'b': return sign + _toBaseStr(mantissa, shift, 1, '0b');
+    case 'o': return sign + _toBaseStr(mantissa, shift, 3, '0o');
+    case 'x': return sign + _toBaseStr(mantissa, shift, 4, '0x');
+    case 'e': return sign + _toSciStr(mantissa, shift, this.prec, sigFigs);
+    default:    return sign + _toDecStr(mantissa, shift, this.prec, sigFigs);
+  }
+};
+
+APContext.prototype.fromString = function(dst, s) {
+  s = s.trim();
+  const sl = s.toLowerCase();
+
+  // Special values
+  if (sl === 'nan')                                             { dst[I_FLAGS] = FLAGS.NAN;     return; }
+  if (sl === 'infinity' || sl === 'inf' || sl === '+infinity' || sl === '+inf') { dst[I_FLAGS] = FLAGS.POS_INF; return; }
+  if (sl === '-infinity' || sl === '-inf')                      { dst[I_FLAGS] = FLAGS.NEG_INF; return; }
+
+  // Sign
+  let neg = false;
+  if      (s[0] === '-') { neg = true; s = s.slice(1); }
+  else if (s[0] === '+') {             s = s.slice(1); }
+
+  // Hex / binary / octal integers (BigInt handles these prefixes natively)
+  if (/^0[xXbBoO]/.test(s)) {
+    _setFromBigInt(dst, BigInt(s), neg, this.prec, this.numLimbs);
+    return;
   }
 
-  toString(f, format = '', sigFigs = null) {
-    if (typeof format === 'number') { sigFigs = format; }
+  // Decimal: [digits][.digits][e[+-]digits]
+  let fracStr = '', decExp = 0;
 
-    if (f[I_FLAGS] === FLAGS.NAN)     return 'NaN';
-    if (f[I_FLAGS] === FLAGS.POS_INF) return 'Infinity';
-    if (f[I_FLAGS] === FLAGS.NEG_INF) return '-Infinity';
-    if (f[I_FLAGS] <= 1)              return (f[I_FLAGS] & 1) ? '-0' : '0';
-
-    const sign = (f[I_FLAGS] & 1) ? '-' : '';
-    const exp  = f[I_EXP] | 0;
-
-    // Reconstruct mantissa as BigInt from big-endian limbs
-    let mantissa = 0n;
-    const lbits  = BigInt(LIMB_BITS);
-    for (let i = 0; i < this.numLimbs; i++)
-      mantissa = (mantissa << lbits) | BigInt(f[HDR + i]);
-
-    // value = mantissa * 2^shift
-    const shift = exp - this.prec;
-
-    switch (format) {
-      case 'b': return sign + _toBaseStr(mantissa, shift, 1, '0b');
-      case 'o': return sign + _toBaseStr(mantissa, shift, 3, '0o');
-      case 'x': return sign + _toBaseStr(mantissa, shift, 4, '0x');
-      case 'e': return sign + _toSciStr(mantissa, shift, this.prec, sigFigs);
-      default:    return sign + _toDecStr(mantissa, shift, this.prec, sigFigs);
-    }
+  const eIdx = s.search(/[eE]/);
+  if (eIdx !== -1) {
+    decExp = parseInt(s.slice(eIdx + 1), 10);
+    s = s.slice(0, eIdx);
   }
 
-  fromString(dst, s) {
-    s = s.trim();
-    const sl = s.toLowerCase();
-
-    // Special values
-    if (sl === 'nan')                                             { dst[I_FLAGS] = FLAGS.NAN;     return; }
-    if (sl === 'infinity' || sl === 'inf' || sl === '+infinity' || sl === '+inf') { dst[I_FLAGS] = FLAGS.POS_INF; return; }
-    if (sl === '-infinity' || sl === '-inf')                      { dst[I_FLAGS] = FLAGS.NEG_INF; return; }
-
-    // Sign
-    let neg = false;
-    if      (s[0] === '-') { neg = true; s = s.slice(1); }
-    else if (s[0] === '+') {             s = s.slice(1); }
-
-    // Hex / binary / octal integers (BigInt handles these prefixes natively)
-    if (/^0[xXbBoO]/.test(s)) {
-      _setFromBigInt(dst, BigInt(s), neg, this.prec, this.numLimbs);
-      return;
-    }
-
-    // Decimal: [digits][.digits][e[+-]digits]
-    let fracStr = '', decExp = 0;
-
-    const eIdx = s.search(/[eE]/);
-    if (eIdx !== -1) {
-      decExp = parseInt(s.slice(eIdx + 1), 10);
-      s = s.slice(0, eIdx);
-    }
-
-    let intStr = s;
-    const dotIdx = s.indexOf('.');
-    if (dotIdx !== -1) {
-      intStr  = s.slice(0, dotIdx);
-      fracStr = s.slice(dotIdx + 1);
-    }
-
-    let sig = BigInt((intStr || '0') + fracStr);
-    decExp -= fracStr.length;
-
-    if (sig === 0n) {
-      dst[I_FLAGS] = neg ? FLAGS.NEG_ZERO : FLAGS.POS_ZERO;
-      dst[I_EXP]   = 0;
-      return;
-    }
-
-    if (decExp >= 0) {
-      // Exact: multiply sig by the decimal shift
-      _setFromBigInt(dst, sig * (10n ** BigInt(decExp)), neg, this.prec, this.numLimbs);
-    } else {
-      // Scale up by 2^(prec+guard) before integer division to preserve binary bits
-      const shift  = this.prec + this.guard;
-      const scaled = (sig << BigInt(shift)) / (10n ** BigInt(-decExp));
-      _setFromBigInt(dst, scaled, neg, this.prec, this.numLimbs);
-      dst[I_EXP] -= shift;
-    }
+  let intStr = s;
+  const dotIdx = s.indexOf('.');
+  if (dotIdx !== -1) {
+    intStr  = s.slice(0, dotIdx);
+    fracStr = s.slice(dotIdx + 1);
   }
 
-  neg(dst, f) {
-    if (f[I_FLAGS] === FLAGS.NAN) { dst[I_FLAGS] = FLAGS.NAN;  return; }
-    dst.set(f);
-    dst[I_FLAGS] ^= 1;
-    return dst;
+  let sig = BigInt((intStr || '0') + fracStr);
+  decExp -= fracStr.length;
+
+  if (sig === 0n) {
+    dst[I_FLAGS] = neg ? FLAGS.NEG_ZERO : FLAGS.POS_ZERO;
+    dst[I_EXP]   = 0;
+    return;
   }
 
-  add(dst, a, b) {
-    if (isZero(a)) { dst.set(b); return; }
-    if (isZero(b)) { dst.set(a); return; }
-    if (
-      isNaN(a) || isNaN(b) ||
-      (isInf(a) && isInf(b) && ((a[I_FLAGS] ^ b[I_FLAGS]) & 1))
-    ) {
-      dst[I_FLAGS] = FLAGS.NAN;
-      return;
+  if (decExp >= 0) {
+    // Exact: multiply sig by the decimal shift
+    _setFromBigInt(dst, sig * (10n ** BigInt(decExp)), neg, this.prec, this.numLimbs);
+  } else {
+    // Scale up by 2^(prec+guard) before integer division to preserve binary bits
+    const shift  = this.prec + this.guard;
+    const scaled = (sig << BigInt(shift)) / (10n ** BigInt(-decExp));
+    _setFromBigInt(dst, scaled, neg, this.prec, this.numLimbs);
+    dst[I_EXP] -= shift;
+  }
+};
+
+APContext.prototype.neg = function(dst, f) {
+  if (f[I_FLAGS] === FLAGS.NAN) { dst[I_FLAGS] = FLAGS.NAN;  return; }
+  dst.set(f);
+  dst[I_FLAGS] ^= 1;
+  return dst;
+};
+
+APContext.prototype.add = function(dst, a, b) {
+  if (isZero(a)) { dst.set(b); return; }
+  if (isZero(b)) { dst.set(a); return; }
+  if (
+    isNaN(a) || isNaN(b) ||
+    (isInf(a) && isInf(b) && ((a[I_FLAGS] ^ b[I_FLAGS]) & 1))
+  ) {
+    dst[I_FLAGS] = FLAGS.NAN;
+    return;
+  }
+
+  if (isInf(a)) { dst[I_FLAGS] = a[I_FLAGS]; return; }
+  if (isInf(b)) { dst[I_FLAGS] = b[I_FLAGS]; return; }
+
+  if (a[I_EXP] < b[I_EXP]) { let temp = a; a = b; b = temp; }
+
+  const expDiff = a[I_EXP] - b[I_EXP];
+  const iDiff = Math.floor(expDiff / LIMB_BITS);
+  if (iDiff >= this.numLimbs) { // b is too small in comparison to a
+    dst.set(a);
+    return;
+  }
+
+  // expDiff = iDiff * LIMB_BITS + offset
+  const offset = expDiff % LIMB_BITS;
+  const invOffset = LIMB_BITS - offset;
+
+  // rounding
+  let roundBit = 0;
+  const lastBLimb = this.numLimbs - 1 - iDiff;
+  if (offset > 0 && lastBLimb >= 0) {
+    roundBit = (b[HDR + lastBLimb] >> (offset - 1)) & 1;
+  } else if (lastBLimb + 1 < this.numLimbs) {
+    roundBit = (b[HDR + lastBLimb + 1] >> (LIMB_BITS - 1)) & 1;
+  }
+
+  // Copy leading limbs of a down to first limb intersecting with b
+  for (let i = 0; i < iDiff; i++) {
+    dst[HDR + i] = a[HDR + i];
+  }
+
+
+  if ((a[I_FLAGS] & 1) === (b[I_FLAGS] & 1)) {
+  // Same sign; add normally
+
+    dst[I_FLAGS] = a[I_FLAGS];
+    dst[I_EXP]   = a[I_EXP];
+
+    let carry = 0;
+
+    // Start adding to all fully-intersecting a limbs
+    for (let i = this.size - 1; i > HDR + iDiff; i--) {
+      dst[i] = a[i] +
+                (b[i - iDiff] >>> offset) +
+                ((b[i - iDiff - 1] & ((1 << offset) - 1)) << invOffset) +
+                carry;
+      if (dst[i] >= LIMB_BASE) {
+        dst[i] -= LIMB_BASE;
+        carry = 1;
+      } else { carry = 0; }
     }
 
-    if (isInf(a)) { dst[I_FLAGS] = a[I_FLAGS]; return; }
-    if (isInf(b)) { dst[I_FLAGS] = b[I_FLAGS]; return; }
+    // Process left-most intersection
+    dst[HDR + iDiff] = a[HDR + iDiff] + (b[HDR] >>> offset) + carry;
+    if (dst[HDR + iDiff] >= LIMB_BASE) { dst[HDR + iDiff] -= LIMB_BASE; carry = 1; }
+    else { carry = 0; }
 
-    if (a[I_EXP] < b[I_EXP]) { let temp = a; a = b; b = temp; }
-
-    const expDiff = a[I_EXP] - b[I_EXP];
-    const iDiff = Math.floor(expDiff / LIMB_BITS);
-    if (iDiff >= this.numLimbs) { // b is too small in comparison to a
-      dst.set(a);
-      return;
+    // Apply carry to rest of a's limbs
+    for (let i = HDR + iDiff - 1; i >= HDR; i--) {
+      dst[i] = a[i] + carry;
+      if (dst[i] >= LIMB_BASE) { dst[i] -= LIMB_BASE; carry = 1; } else { carry = 0; }
     }
 
-    // expDiff = iDiff * LIMB_BITS + offset
-    const offset = expDiff % LIMB_BITS;
-    const invOffset = LIMB_BITS - offset;
-
-    // rounding
-    let roundBit = 0;
-    const lastBLimb = this.numLimbs - 1 - iDiff;
-    if (offset > 0 && lastBLimb >= 0) {
-      roundBit = (b[HDR + lastBLimb] >> (offset - 1)) & 1;
-    } else if (lastBLimb + 1 < this.numLimbs) {
-      roundBit = (b[HDR + lastBLimb + 1] >> (LIMB_BITS - 1)) & 1;
-    }
-
-    // Copy leading limbs of a down to first limb intersecting with b
-    for (let i = 0; i < iDiff; i++) {
-      dst[HDR + i] = a[HDR + i];
-    }
-
-
-    if ((a[I_FLAGS] & 1) === (b[I_FLAGS] & 1)) {
-    // Same sign; add normally
-
-      dst[I_FLAGS] = a[I_FLAGS];
-      dst[I_EXP]   = a[I_EXP];
-
-      let carry = 0;
-
-      // Start adding to all fully-intersecting a limbs
-      for (let i = this.size - 1; i > HDR + iDiff; i--) {
-        dst[i] = a[i] +
-                 (b[i - iDiff] >>> offset) +
-                 ((b[i - iDiff - 1] & ((1 << offset) - 1)) << invOffset) +
-                 carry;
-        if (dst[i] >= LIMB_BASE) {
-          dst[i] -= LIMB_BASE;
-          carry = 1;
-        } else { carry = 0; }
+    // Add back round bit
+    if (roundBit) {
+      for (let i = this.size - 1; i >= HDR; i--) {
+        dst[i]++;
+        if (dst[i] < LIMB_BASE) break;
+        dst[i] = 0;
+        if (i === HDR) { carry = 1; break; }  // rounding itself caused overflow
       }
+    }
 
-      // Process left-most intersection
-      dst[HDR + iDiff] = a[HDR + iDiff] + (b[HDR] >>> offset) + carry;
-      if (dst[HDR + iDiff] >= LIMB_BASE) { dst[HDR + iDiff] -= LIMB_BASE; carry = 1; }
-      else { carry = 0; }
-
-      // Apply carry to rest of a's limbs
-      for (let i = HDR + iDiff - 1; i >= HDR; i--) {
-        dst[i] = a[i] + carry;
-        if (dst[i] >= LIMB_BASE) { dst[i] -= LIMB_BASE; carry = 1; } else { carry = 0; }
+    if (carry) {
+    // Final carry; shift everything down 1 bit
+      const shiftRound = dst[this.size - 1] & 1; // LSB about to be dropped
+      let bit = dst[HDR] & 1, tempBit;
+      dst[HDR] = (dst[HDR] + LIMB_BASE) >> 1;
+      for (let i = HDR + 1; i < this.size; i++) {
+        tempBit = bit;
+        bit = dst[i] & 1;
+        dst[i] = (-tempBit & (LIMB_BASE >> 1)) + (dst[i] >> 1);
       }
-
-      // Add back round bit
-      if (roundBit) {
+      dst[I_EXP]++;
+      
+      // Add back shift round bit
+      if (shiftRound) {
         for (let i = this.size - 1; i >= HDR; i--) {
           dst[i]++;
           if (dst[i] < LIMB_BASE) break;
           dst[i] = 0;
-          if (i === HDR) { carry = 1; break; }  // rounding itself caused overflow
+          // at this point, all lower limbs have been zeroed out by the carry propagation,
+          // so just set the MSL to 1 and increase the exponent
+          if (i === HDR) { dst[HDR] = LIMB_BASE >> 1; dst[I_EXP]++; break; }
         }
       }
+    }
 
-      if (carry) {
-      // Final carry; shift everything down 1 bit
-        const shiftRound = dst[this.size - 1] & 1; // LSB about to be dropped
-        let bit = dst[HDR] & 1, tempBit;
-        dst[HDR] = (dst[HDR] + LIMB_BASE) >> 1;
-        for (let i = HDR + 1; i < this.size; i++) {
-          tempBit = bit;
-          bit = dst[i] & 1;
-          dst[i] = (-tempBit & (LIMB_BASE >> 1)) + (dst[i] >> 1);
-        }
-        dst[I_EXP]++;
-        
-        // Add back shift round bit
-        if (shiftRound) {
-          for (let i = this.size - 1; i >= HDR; i--) {
-            dst[i]++;
-            if (dst[i] < LIMB_BASE) break;
-            dst[i] = 0;
-            // at this point, all lower limbs have been zeroed out by the carry propagation,
-            // so just set the MSL to 1 and increase the exponent
-            if (i === HDR) { dst[HDR] = LIMB_BASE >> 1; dst[I_EXP]++; break; }
-          }
+  } else {
+  // Different sign: subtract
+    if (expDiff === 0) {
+    // Ensure a is larger
+      let i;
+      for (i = HDR; i < this.size; i++) {
+        if (a[i] > b[i]) { break; }
+        if (a[i] < b[i]) {
+          let temp = a;  a = b;  b = temp;
+          break;
         }
       }
-
-    } else {
-    // Different sign: subtract
-      if (expDiff === 0) {
-      // Ensure a is larger
-        let i;
-        for (i = HDR; i < this.size; i++) {
-          if (a[i] > b[i]) { break; }
-          if (a[i] < b[i]) {
-            let temp = a;  a = b;  b = temp;
-            break;
-          }
-        }
-        if (i === this.size) {
-        // a == b; return 0
-          dst[I_FLAGS] = FLAGS.POS_ZERO;
-          return;
-        }
+      if (i === this.size) {
+      // a == b; return 0
+        dst[I_FLAGS] = FLAGS.POS_ZERO;
+        return;
       }
-      dst[I_FLAGS] = a[I_FLAGS];
-      dst[I_EXP]   = a[I_EXP];
+    }
+    dst[I_FLAGS] = a[I_FLAGS];
+    dst[I_EXP]   = a[I_EXP];
 
-      let borrow = roundBit;
+    let borrow = roundBit;
 
-      // Process all intersecting limbs
-      for (let i = this.size - 1; i > HDR + iDiff; i--) {
-        dst[i] = a[i] -
-                 (b[i - iDiff] >>> offset) -
-                 ((b[i - iDiff - 1] & ((1 << offset) - 1)) << invOffset) -
-                 borrow;
-        if (dst[i] < 0) {
-          dst[i] += LIMB_BASE;
-          borrow = 1;
-        } else { borrow = 0; }
-      }
-
-      // Process left-most intersection / final borrow
-      dst[HDR + iDiff] = a[HDR + iDiff] - (b[HDR] >>> offset) - borrow;
-      let i = HDR + iDiff;
-      while (dst[i] < 0) {
+    // Process all intersecting limbs
+    for (let i = this.size - 1; i > HDR + iDiff; i--) {
+      dst[i] = a[i] -
+                (b[i - iDiff] >>> offset) -
+                ((b[i - iDiff - 1] & ((1 << offset) - 1)) << invOffset) -
+                borrow;
+      if (dst[i] < 0) {
         dst[i] += LIMB_BASE;
-        dst[i - 1]--;
         borrow = 1;
-        i--;
-        dst[i] = a[i] - borrow;
-      }
-
-      // Shift out leading zeroes
-      i = HDR;
-      let shiftI = 0, shiftOffset = 0;
-      while (i < this.size && dst[i] === 0) { shiftI++;  i++; }
-      let r = dst[i];
-      while (r < (LIMB_BASE >> 1)) { shiftOffset++;  r <<= 1; }
-      const invShiftOffset = LIMB_BITS - shiftOffset;
-      for (i = HDR; i < this.size - shiftI - 1; i++) {
-        dst[i] = ((dst[i + shiftI] << shiftOffset) & LIMB_MASK) + (dst[i + shiftI + 1] >>> invShiftOffset);
-      }
-      dst[this.size - shiftI - 1] = (dst[this.size - 1] << shiftOffset) & LIMB_MASK;
-      i++;
-      // Clear out rest of limbs after shifting
-      for (; i < this.size; i++) {
-        dst[i] = 0;
-      }
-      // Update exponent based on zero-shifting
-      dst[I_EXP] -= shiftI * LIMB_BITS + shiftOffset;
+      } else { borrow = 0; }
     }
-    return dst;
+
+    // Process left-most intersection / final borrow
+    dst[HDR + iDiff] = a[HDR + iDiff] - (b[HDR] >>> offset) - borrow;
+    let i = HDR + iDiff;
+    while (dst[i] < 0) {
+      dst[i] += LIMB_BASE;
+      dst[i - 1]--;
+      borrow = 1;
+      i--;
+      dst[i] = a[i] - borrow;
+    }
+
+    // Shift out leading zeroes
+    i = HDR;
+    let shiftI = 0, shiftOffset = 0;
+    while (i < this.size && dst[i] === 0) { shiftI++;  i++; }
+    let r = dst[i];
+    while (r < (LIMB_BASE >> 1)) { shiftOffset++;  r <<= 1; }
+    const invShiftOffset = LIMB_BITS - shiftOffset;
+    for (i = HDR; i < this.size - shiftI - 1; i++) {
+      dst[i] = ((dst[i + shiftI] << shiftOffset) & LIMB_MASK) + (dst[i + shiftI + 1] >>> invShiftOffset);
+    }
+    dst[this.size - shiftI - 1] = (dst[this.size - 1] << shiftOffset) & LIMB_MASK;
+    i++;
+    // Clear out rest of limbs after shifting
+    for (; i < this.size; i++) {
+      dst[i] = 0;
+    }
+    // Update exponent based on zero-shifting
+    dst[I_EXP] -= shiftI * LIMB_BITS + shiftOffset;
+  }
+  return dst;
+};
+
+APContext.prototype.sub = function(dst, a, b) {
+  b[I_FLAGS] ^= 1;
+  this.add(dst, a, b);
+  if (dst !== b) b[I_FLAGS] ^= 1;
+  return dst;
+};
+
+APContext.prototype.mul =
+APContext.prototype.mulLong = function(dst, a, b) {
+  // if any operand is also the destination, copy it first
+  if (dst === a) { a = this.alloc(dst); }
+  if (dst === b) { b = this.alloc(dst); }
+
+  let aInf = isInf(a), bInf = isInf(b), aZero = isZero(a), bZero = isZero(b);
+
+  if (isNaN(a) || isNaN(b) || (aZero && bInf) || (bZero && aInf)) {
+    dst[I_FLAGS] = FLAGS.NAN;
+    return;
   }
 
-  sub(dst, a, b) {
-    b[I_FLAGS] ^= 1;
-    this.add(dst, a, b);
-    if (dst !== b) b[I_FLAGS] ^= 1;
-    return dst;
+  let diffSign = (a[I_FLAGS] & 1) ^ (b[I_FLAGS] & 1);
+
+  if (aZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
+  if (bZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
+  if (aInf && !bInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
+  if (bInf && !aInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
+  if (aInf && bInf) {
+    dst[I_FLAGS] = FLAGS.POS_INF + diffSign;
+    return;
   }
 
-  mulLong(dst, a, b) {
-    // if any operand is also the destination, copy it first
-    if (dst === a) { a = this.alloc(dst); }
-    if (dst === b) { b = this.alloc(dst); }
 
-    let aInf = isInf(a), bInf = isInf(b), aZero = isZero(a), bZero = isZero(b);
+  dst[I_EXP] = a[I_EXP] + b[I_EXP] - LIMB_BITS;
+  dst[I_FLAGS] = FLAGS.POS_NORMAL;
+  if (((a[I_FLAGS] & 1) ^ (b[I_FLAGS] & 1))) dst[I_FLAGS] = FLAGS.NEG_NORMAL;
 
-    if (isNaN(a) || isNaN(b) || (aZero && bInf) || (bZero && aInf)) {
-      dst[I_FLAGS] = FLAGS.NAN;
-      return;
-    }
+  // Start by calculating an extra limb (numLimbs + 1)
+  let carry = 0;
+  let rem = 0;
+  let term;
 
-    let diffSign = (a[I_FLAGS] & 1) ^ (b[I_FLAGS] & 1);
+  for (let i = 1; i < this.numLimbs; i++) {
+    term = a[HDR + i] * b[this.size - i];
+    carry += term >>> LIMB_BITS;
+    rem += term & LIMB_MASK;
+  }
+  carry += rem >>> LIMB_BITS;
+  rem &= LIMB_MASK;
 
-    if (aZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
-    if (bZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
-    if (aInf && !bInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
-    if (bInf && !aInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
-    if (aInf && bInf) {
-      dst[I_FLAGS] = FLAGS.POS_INF + diffSign;
-      return;
-    }
+  // Set smallest result limb to (initial carry + round bit)
+  dst[this.size - 1] = carry + (rem >>> (LIMB_BITS - 1));
 
-
-    dst[I_EXP] = a[I_EXP] + b[I_EXP] - LIMB_BITS;
-    dst[I_FLAGS] = FLAGS.POS_NORMAL;
-    if (((a[I_FLAGS] & 1) ^ (b[I_FLAGS] & 1))) dst[I_FLAGS] = FLAGS.NEG_NORMAL;
-
-    // Start by calculating an extra limb (numLimbs + 1)
-    let carry = 0;
-    let rem = 0;
-    let term;
-
-    for (let i = 1; i < this.numLimbs; i++) {
-      term = a[HDR + i] * b[this.size - i];
+  // Main limb computations
+  let n = this.numLimbs;
+  for (let i = this.size - 1; i > HDR; i--, n--) {
+    carry = 0;
+    for (let j = 0; j < n; j++) {
+      term = a[HDR + j] * b[i - j];
       carry += term >>> LIMB_BITS;
-      rem += term & LIMB_MASK;
+      dst[i] += term & LIMB_MASK;
     }
-    carry += rem >>> LIMB_BITS;
-    rem &= LIMB_MASK;
-
-    // Set smallest result limb to (initial carry + round bit)
-    dst[this.size - 1] = carry + (rem >>> (LIMB_BITS - 1));
-
-    // Main limb computations
-    let n = this.numLimbs;
-    for (let i = this.size - 1; i > HDR; i--, n--) {
-      carry = 0;
-      for (let j = 0; j < n; j++) {
-        term = a[HDR + j] * b[i - j];
-        carry += term >>> LIMB_BITS;
-        dst[i] += term & LIMB_MASK;
-      }
-      dst[i - 1] = carry + (dst[i] >>> LIMB_BITS); // Carry into previous limb
-      dst[i] &= LIMB_MASK;
-    }
-
-    // First limb
-    term = a[HDR] * b[HDR];
-    dst[HDR] += term & LIMB_MASK;
-    carry = (term >>> LIMB_BITS) + (dst[HDR] >>> LIMB_BITS);
-    dst[HDR] &= LIMB_MASK;
-    
-
-    if (!carry) return dst;
-
-    // Shift all limbs down to accomodate carry
-    let offset = 1;
-    let c = carry;
-    while (c >>>= 1) {
-      offset++;
-    }
-
-    dst[I_EXP] += offset;
-
-    let mask = (1 << offset) - 1,
-        invOffset = LIMB_BITS - offset,
-        shiftIn = carry,
-        tmp;
-    
-    for (let i = HDR; i < this.size; i++) {
-      tmp = shiftIn;
-      shiftIn = dst[i] & mask;
-      dst[i] >>>= offset;
-      dst[i] += (tmp << invOffset);
-    }
-    
-    let roundBit = shiftIn >>> (offset - 1);
-    if (roundBit) {
-      let i = this.size - 1;
-      dst[i]++;
-      while (dst[i] >= LIMB_BASE) {
-        dst[i] -= LIMB_BASE;
-        dst[--i]++;
-      }
-    }
-    return dst;
+    dst[i - 1] = carry + (dst[i] >>> LIMB_BITS); // Carry into previous limb
+    dst[i] &= LIMB_MASK;
   }
 
-  recip(dst, d, tmp = null) {
-    if (isNaN(d)) { dst[I_FLAGS] = FLAGS.NAN; return dst }
-    if (isZero(d)) { dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_INF : FLAGS.POS_INF; return dst; }
-    if (isInf(d)) { dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_ZERO : FLAGS.POS_ZERO; return dst; }
+  // First limb
+  term = a[HDR] * b[HDR];
+  dst[HDR] += term & LIMB_MASK;
+  carry = (term >>> LIMB_BITS) + (dst[HDR] >>> LIMB_BITS);
+  dst[HDR] &= LIMB_MASK;
+  
 
-    if (dst === d) {
-      d = new Int32Array(d);
-    }
+  if (!carry) return dst;
 
-    dst[I_PREC]  = this.prec;
-    dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_NORMAL : FLAGS.POS_NORMAL;
-    const x0Top  = 3 * (LIMB_BASE >> 1) - d[HDR];  // 3×2^15 - d_top
-    if (x0Top >= LIMB_BASE) {          // only happens when d_top = 0x8000 exactly
-      dst[HDR]   = LIMB_BASE >> 1;
-      dst[I_EXP] = -d[I_EXP] + 1;
-    } else {
-      dst[HDR]   = x0Top;
-      dst[I_EXP] = -d[I_EXP];
-    }
-    for (let i = HDR + 1; i < this.size; i++) dst[i] = 0;
-
-    if (!tmp) {
-      tmp = this.alloc();
-    }
-
-    for (let i = 0; i < Math.floor(Math.log2(this.prec)) + 2; i++) {
-      this.mulLong(tmp, dst, this.sub(tmp, this.n2, this.mulLong(tmp, d, dst)));
-      dst.set(tmp);
-    }
-    return dst;
+  // Shift all limbs down to accomodate carry
+  let offset = 1;
+  let c = carry;
+  while (c >>>= 1) {
+    offset++;
   }
 
-  div(dst, a, b, tmp = null) {
-    if (!tmp) { tmp = this.alloc(); }
-    return this.mulLong(dst, a, this.recip(tmp, b));
-  }
-}
+  dst[I_EXP] += offset;
 
-// Alias
-APContext.prototype.ap = APContext.prototype.alloc;
+  let mask = (1 << offset) - 1,
+      invOffset = LIMB_BITS - offset,
+      shiftIn = carry,
+      tmp;
+  
+  for (let i = HDR; i < this.size; i++) {
+    tmp = shiftIn;
+    shiftIn = dst[i] & mask;
+    dst[i] >>>= offset;
+    dst[i] += (tmp << invOffset);
+  }
+  
+  let roundBit = shiftIn >>> (offset - 1);
+  if (roundBit) {
+    let i = this.size - 1;
+    dst[i]++;
+    while (dst[i] >= LIMB_BASE) {
+      dst[i] -= LIMB_BASE;
+      dst[--i]++;
+    }
+  }
+  return dst;
+};
+
+APContext.prototype.recip = function(dst, d, tmp = null) {
+  if (isNaN(d)) { dst[I_FLAGS] = FLAGS.NAN; return dst }
+  if (isZero(d)) { dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_INF : FLAGS.POS_INF; return dst; }
+  if (isInf(d)) { dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_ZERO : FLAGS.POS_ZERO; return dst; }
+
+  if (dst === d) {
+    d = new Int32Array(d);
+  }
+
+  dst[I_PREC]  = this.prec;
+  dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_NORMAL : FLAGS.POS_NORMAL;
+  const x0Top  = 3 * (LIMB_BASE >> 1) - d[HDR];  // 3×2^15 - d_top
+  if (x0Top >= LIMB_BASE) {          // only happens when d_top = 0x8000 exactly
+    dst[HDR]   = LIMB_BASE >> 1;
+    dst[I_EXP] = -d[I_EXP] + 1;
+  } else {
+    dst[HDR]   = x0Top;
+    dst[I_EXP] = -d[I_EXP];
+  }
+  for (let i = HDR + 1; i < this.size; i++) dst[i] = 0;
+
+  if (!tmp) {
+    tmp = this.alloc();
+  }
+
+  for (let i = 0; i < Math.floor(Math.log2(this.prec)) + 2; i++) {
+    this.mulLong(tmp, dst, this.sub(tmp, this.n2, this.mulLong(tmp, d, dst)));
+    dst.set(tmp);
+  }
+  return dst;
+};
+
+APContext.prototype.div = function(dst, a, b, tmp = null) {
+  if (!tmp) { tmp = this.alloc(); }
+  return this.mulLong(dst, a, this.recip(tmp, b));
+};
 
 // Converts a non-negative BigInt into the flat-array float format.
 // value = val * 2^adjExp (adjExp applied by caller after this returns, default 0)

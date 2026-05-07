@@ -1,5 +1,5 @@
 import { TestSuite } from '../assert-js/test-suite.js';
-import { assertEqual, assertNotEqual, assert, assertInstance, assertThrows } from '../assert-js/assert.js';
+import { assertEqual, assertNotEqual, assert, assertInstance, assertThrows, assertTruthy } from '../assert-js/assert.js';
 import { APContext, FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS } from '../ap.js';
 
 // ─── constructor ─────────────────────────────────────────────────────────────
@@ -42,8 +42,8 @@ new TestSuite('APContext alloc()', {
   },
 
   'sets prec header': () => {
-    const ctx = new APContext(78);
-    assertEqual(ctx.alloc()[I_PREC], 78);
+    const ctx = new APContext(32);
+    assertEqual(ctx.alloc()[I_PREC], 32);
   },
 
   'sets exp to 0': () => {
@@ -474,13 +474,6 @@ new TestSuite('APContext precision', {
     const ctx = new APContext(78), f = ctx.alloc();
     ctx.fromString(f, '9007199254740993');
     assertEqual(ctx.toString(f), '9007199254740993');
-  },
-
-  // Corollary: at prec=52 (like float64) it should round, just as float64 does.
-  'prec=52 rounds 2^53+1 like float64': () => {
-    const ctx = new APContext(52), f = ctx.alloc();
-    ctx.fromString(f, '9007199254740993');
-    assertEqual(ctx.toString(f), '9007199254740992');
   },
 
   // A 128-bit number uses ceil(128/LIMB_BITS) limbs. If precision is real, multiple
@@ -1164,6 +1157,202 @@ new TestSuite('APContext mulLong()', {
     ctx64.mulLong(dst64, ctx64.ap('257'), ctx64.ap('257'));
     assertEqual(ctx64.toString(dst64), '66049');
     assertEqual(ctx16.toString(dst16), '66050');
+  },
+
+}).runTests();
+
+new TestSuite('recip()', {
+
+  // --- special values ---
+  'recip(NaN) = NaN': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('NaN'));
+    assertEqual(ctx.toString(dst), 'NaN');
+  },
+  'recip(0) = Infinity': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('0'));
+    assertEqual(ctx.toString(dst), 'Infinity');
+  },
+  'recip(-0) = -Infinity': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('-0'));
+    assertEqual(ctx.toString(dst), '-Infinity');
+  },
+  'recip(Infinity) = 0': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('Infinity'));
+    assertEqual(ctx.toString(dst), '0');
+  },
+  'recip(-Infinity) = -0': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('-Infinity'));
+    assertEqual(ctx.toString(dst), '-0');
+  },
+
+  // --- exact (power-of-2) cases ---
+  'recip(1) = 1': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('1'));
+    assertEqual(ctx.toString(dst, 3), '1.00');
+  },
+  'recip(2) = 0.5': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('2'));
+    assertEqual(ctx.toString(dst, 3), '0.500');
+  },
+  'recip(4) = 0.25': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('4'));
+    assertEqual(ctx.toString(dst, 3), '0.250');
+  },
+  'recip(0.5) = 2': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('0.5'));
+    assertEqual(ctx.toString(dst, 3), '2.00');
+  },
+  'recip(0.125) = 8': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('0.125'));
+    assertEqual(ctx.toString(dst, 3), '8.00');
+  },
+
+  // --- negative ---
+  'recip(-2) = -0.5': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('-2'));
+    assertEqual(ctx.toString(dst, 2), '-0.50');
+  },
+  'recip(-0.25) = -4': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('-0.25'));
+    assertEqual(ctx.toString(dst, 2), '-4.0');
+  },
+
+  // --- aliasing: dst === d ---
+  'dst === d': () => {
+    const ctx = new APContext(32);
+    const a = ctx.ap('4');
+    ctx.recip(a, a);
+    assertEqual(ctx.toString(a, 3), '0.250');
+  },
+
+  // --- accuracy at larger precisions ---
+  'recip(3) at prec=64 has ~19 correct digits': () => {
+    const ctx = new APContext(64);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('3'));
+    assertTruthy(ctx.toString(dst).startsWith('0.333333333333333333'));
+  },
+  'recip(7) at prec=128 has ~38 correct digits': () => {
+    const ctx = new APContext(128);
+    const dst = ctx.ap();
+    ctx.recip(dst, ctx.ap('7'));
+    assertTruthy(ctx.toString(dst).startsWith('0.142857142857142857142857142857'));
+  },
+
+}).runTests();
+
+new TestSuite('div()', {
+
+  // --- special values ---
+  'div(1, 0) = Infinity': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('1'), ctx.ap('0'));
+    assertEqual(ctx.toString(dst), 'Infinity');
+  },
+  'div(0, 1) = 0': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('0'), ctx.ap('1'));
+    assertEqual(ctx.toString(dst), '0');
+  },
+  'div(NaN, 1) = NaN': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('NaN'), ctx.ap('1'));
+    assertEqual(ctx.toString(dst), 'NaN');
+  },
+
+  // --- exact cases ---
+  'div(6, 2) = 3': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('6'), ctx.ap('2'));
+    assertEqual(ctx.toString(dst, 2), '3.0');
+  },
+  'div(1, 4) = 0.25': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('1'), ctx.ap('4'));
+    assertEqual(ctx.toString(dst, 2), '0.25');
+  },
+  'div(3, 1) = 3': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('3'), ctx.ap('1'));
+    assertEqual(ctx.toString(dst, 2), '3.0');
+  },
+
+  // --- sign ---
+  'div(-6, 2) = -3': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('-6'), ctx.ap('2'));
+    assertEqual(ctx.toString(dst, 2), '-3.0');
+  },
+  'div(6, -2) = -3': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('6'), ctx.ap('-2'));
+    assertEqual(ctx.toString(dst, 2), '-3.0');
+  },
+  'div(-6, -2) = 3': () => {
+    const ctx = new APContext(32);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('-6'), ctx.ap('-2'));
+    assertEqual(ctx.toString(dst, 2), '3.0');
+  },
+
+  // --- aliasing ---
+  'dst === a': () => {
+    const ctx = new APContext(32);
+    const a = ctx.ap('6'), b = ctx.ap('2');
+    ctx.div(a, a, b);
+    assertEqual(ctx.toString(a, 2), '3.0');
+  },
+  'dst === b': () => {
+    const ctx = new APContext(32);
+    const a = ctx.ap('6'), b = ctx.ap('2');
+    ctx.div(b, a, b);
+    assertEqual(ctx.toString(b, 2), '3.0');
+  },
+  'a === b gives 1': () => {
+    const ctx = new APContext(32);
+    const x = ctx.ap('4'), dst = ctx.ap();
+    ctx.div(dst, x, x);
+    assertEqual(ctx.toString(dst, 2), '1.0');
+  },
+
+  // --- accuracy ---
+  'div(1, 3) at prec=64 has ~19 correct digits': () => {
+    const ctx = new APContext(64);
+    const dst = ctx.ap();
+    ctx.div(dst, ctx.ap('1'), ctx.ap('3'));
+    assertTruthy(ctx.toString(dst).startsWith('0.333333333333333333'));
   },
 
 }).runTests();

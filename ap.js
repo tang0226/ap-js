@@ -26,10 +26,13 @@ const isNaN    = (f) => f[I_FLAGS] === 6;
 
 export class APContext {
   constructor(prec, guard = 16) {
-    this.prec     = prec;
     this.guard    = guard;
     this.numLimbs = Math.ceil(prec / LIMB_BITS);
+    this.prec     = this.numLimbs * LIMB_BITS;
     this.size     = HDR + this.numLimbs;
+
+    // Constants
+    this.n2 = this.alloc(2);
   }
 
   alloc(input) {
@@ -48,7 +51,9 @@ export class APContext {
     return f;
   }
 
-  toString(f, format = '') {
+  toString(f, format = '', sigFigs = null) {
+    if (typeof format === 'number') { sigFigs = format; }
+
     if (f[I_FLAGS] === FLAGS.NAN)     return 'NaN';
     if (f[I_FLAGS] === FLAGS.POS_INF) return 'Infinity';
     if (f[I_FLAGS] === FLAGS.NEG_INF) return '-Infinity';
@@ -70,8 +75,8 @@ export class APContext {
       case 'b': return sign + _toBaseStr(mantissa, shift, 1, '0b');
       case 'o': return sign + _toBaseStr(mantissa, shift, 3, '0o');
       case 'x': return sign + _toBaseStr(mantissa, shift, 4, '0x');
-      case 'e': return sign + _toSciStr(mantissa, shift, this.prec);
-      default:    return sign + _toDecStr(mantissa, shift, this.prec);
+      case 'e': return sign + _toSciStr(mantissa, shift, this.prec, sigFigs);
+      default:    return sign + _toDecStr(mantissa, shift, this.prec, sigFigs);
     }
   }
 
@@ -136,6 +141,7 @@ export class APContext {
     if (f[I_FLAGS] === FLAGS.NAN) { dst[I_FLAGS] = FLAGS.NAN;  return; }
     dst.set(f);
     dst[I_FLAGS] ^= 1;
+    return dst;
   }
 
   add(dst, a, b) {
@@ -311,18 +317,20 @@ export class APContext {
       // Update exponent based on zero-shifting
       dst[I_EXP] -= shiftI * LIMB_BITS + shiftOffset;
     }
+    return dst;
   }
 
   sub(dst, a, b) {
     b[I_FLAGS] ^= 1;
     this.add(dst, a, b);
     if (dst !== b) b[I_FLAGS] ^= 1;
+    return dst;
   }
 
   mulLong(dst, a, b) {
     // if any operand is also the destination, copy it first
-    if (dst === a) { a = this.alloc(); a.set(dst); }
-    if (dst === b) { b = this.alloc(); b.set(dst); }
+    if (dst === a) { a = this.alloc(dst); }
+    if (dst === b) { b = this.alloc(dst); }
 
     let aInf = isInf(a), bInf = isInf(b), aZero = isZero(a), bZero = isZero(b);
 
@@ -383,7 +391,7 @@ export class APContext {
     dst[HDR] &= LIMB_MASK;
     
 
-    if (!carry) return;
+    if (!carry) return dst;
 
     // Shift all limbs down to accomodate carry
     let offset = 1;
@@ -415,6 +423,44 @@ export class APContext {
         dst[--i]++;
       }
     }
+    return dst;
+  }
+
+  recip(dst, d, tmp = null) {
+    if (isNaN(d)) { dst[I_FLAGS] = FLAGS.NAN; return dst }
+    if (isZero(d)) { dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_INF : FLAGS.POS_INF; return dst; }
+    if (isInf(d)) { dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_ZERO : FLAGS.POS_ZERO; return dst; }
+
+    if (dst === d) {
+      d = new Int32Array(d);
+    }
+
+    dst[I_PREC]  = this.prec;
+    dst[I_FLAGS] = isNeg(d) ? FLAGS.NEG_NORMAL : FLAGS.POS_NORMAL;
+    const x0Top  = 3 * (LIMB_BASE >> 1) - d[HDR];  // 3×2^15 - d_top
+    if (x0Top >= LIMB_BASE) {          // only happens when d_top = 0x8000 exactly
+      dst[HDR]   = LIMB_BASE >> 1;
+      dst[I_EXP] = -d[I_EXP] + 1;
+    } else {
+      dst[HDR]   = x0Top;
+      dst[I_EXP] = -d[I_EXP];
+    }
+    for (let i = HDR + 1; i < this.size; i++) dst[i] = 0;
+
+    if (!tmp) {
+      tmp = this.alloc();
+    }
+
+    for (let i = 0; i < Math.floor(Math.log2(this.prec)) + 2; i++) {
+      this.mulLong(tmp, dst, this.sub(tmp, this.n2, this.mulLong(tmp, d, dst)));
+      dst.set(tmp);
+    }
+    return dst;
+  }
+
+  div(dst, a, b, tmp = null) {
+    if (!tmp) { tmp = this.alloc(); }
+    return this.mulLong(dst, a, this.recip(tmp, b));
   }
 }
 
@@ -465,7 +511,7 @@ function _setFromBigInt(dst, val, neg, prec, numLimbs) {
 }
 
 // Convert mantissa*2^shift to a decimal string with enough digits for `prec` bits.
-function _toDecStr(mantissa, shift, prec) {
+function _toDecStr(mantissa, shift, prec, sigFigs = null) {
   if (shift >= 0) return (mantissa << BigInt(shift)).toString(10);
 
   const negShift = BigInt(-shift);
@@ -478,13 +524,52 @@ function _toDecStr(mantissa, shift, prec) {
   const numDig = Math.ceil(prec * Math.log10(2)) + 2;
   const scaled  = (fracBits * (10n ** BigInt(numDig))) >> negShift;
   const fracStr = scaled.toString(10).padStart(numDig, '0').replace(/0+$/, '');
+  const intStr = intPart.toString(10);
+  
+  if (sigFigs === null) {
+    return intPart.toString(10) + '.' + fracStr;
+  }
 
-  return intPart.toString(10) + '.' + fracStr;
+  const d = (intStr + fracStr).split('').map(Number);
+  let dp = intStr.length; // number of digs in d before decimal point
+  let found = false;
+  let sf = 0, i;
+  for (i = 0; i < d.length; i++) {
+    if (d[i]) { found = true; }
+    if (found) {
+      sf++;
+      if (sf === sigFigs) { break; }
+    }
+  }
+
+  if (sf === sigFigs) { // found cutoff point for correct number of sig figs
+    let roundDig = d[i + 1];
+    d.splice(i + 1);
+
+    if (roundDig >= 5) {
+      while (i >= 0 && ++d[i] >= 10) { d[i] = 0; i--; }
+    }
+    if (i < 0) { d.unshift(1); dp++; } // overflow
+    // if carry reached to first dig and incremented the leading dec. 0 to 1
+    // OR if an overflow digit was added, pop from d to preserve the proper number of sf.
+    if (i < 0 || (i === 0 && d[0] === 1)) { d.pop() }
+
+    let int, frac;
+    if (dp >= d.length) { int = d.join('') + '0'.repeat(dp - d.length); frac = ''; }
+    else { int = d.slice(0, dp).join(''); frac = d.slice(dp).join(''); }
+
+    return int + (frac ? '.' + frac : '');
+  }
+
+  // otherwise, loop end reached without enough sf; we need to add 0's\
+  let int = d.slice(0, dp).join('');
+  let frac = d.slice(dp).join('');
+  return int + (frac ? '.' + frac : '') + '0'.repeat(sigFigs - sf);
 }
 
 // Convert to scientific notation: d.dddde±XX
-function _toSciStr(mantissa, shift, prec) {
-  const dec     = _toDecStr(mantissa, shift, prec);
+function _toSciStr(mantissa, shift, prec, sigFigs = null) {
+  const dec     = _toDecStr(mantissa, shift, prec, sigFigs);
   const dotIdx  = dec.indexOf('.');
   const intStr  = dotIdx === -1 ? dec : dec.slice(0, dotIdx);
   const fracStr = dotIdx === -1 ? '' : dec.slice(dotIdx + 1);

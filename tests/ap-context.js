@@ -835,10 +835,11 @@ new TestSuite('APContext add()', {
 
   // aliasing
   'dst === a (in-place a += b)': () => {
-    const ctx = new APContext(16);
-    const a = ctx.ap('1'), b = ctx.ap('1');
+    const ctx = new APContext(64);
+    const a = ctx.ap('200000000000000'), b = ctx.ap('100000000000000');
     ctx.add(a, a, b);
-    assertEqual(ctx.toString(a), '2');
+    assertEqual(ctx.toString(a), '300000000000000');
+    assertEqual(ctx.toString(b), '100000000000000');
   },
 
   'dst === b (in-place b = a + b)': () => {

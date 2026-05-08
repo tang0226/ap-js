@@ -139,6 +139,10 @@ APContext.prototype.fromString = function(dst, s) {
   }
 };
 
+APContext.prototype.toNumber = function(f) {
+  return Number(this.toString(f));
+};
+
 APContext.prototype.neg = function(dst, f) {
   if (f[I_FLAGS] === FLAGS.NAN) { dst[I_FLAGS] = FLAGS.NAN;  return; }
   dst.set(f);
@@ -392,7 +396,7 @@ APContext.prototype.mulLong = function(dst, a, b) {
   dst[HDR] += term & LIMB_MASK;
   carry = (term >>> LIMB_BITS) + (dst[HDR] >>> LIMB_BITS);
   dst[HDR] &= LIMB_MASK;
-  
+
 
   if (!carry) return dst;
 
@@ -420,12 +424,15 @@ APContext.prototype.mulLong = function(dst, a, b) {
   let roundBit = shiftIn >>> (offset - 1);
   if (roundBit) {
     let i = this.size - 1;
-    dst[i]++;
-    while (dst[i] >= LIMB_BASE) {
-      dst[i] -= LIMB_BASE;
-      dst[--i]++;
+    while (++dst[i] >= LIMB_BASE && i >= HDR) {
+      dst[i] = 0;
+      i--;
+    }
+    if (i < HDR) { // Carry reached past MSL; set first bit of first limb to 1; all else is 0'ed out
+      dst[HDR] = LIMB_BASE >>> 1;
     }
   }
+
   return dst;
 };
 
@@ -465,6 +472,37 @@ APContext.prototype.div = function(dst, a, b, tmp = null) {
   if (!tmp) { tmp = this.alloc(); }
   return this.mulLong(dst, a, this.recip(tmp, b));
 };
+
+APContext.prototype.sq = function(dst, f, tmp = null) {
+  return this.mulLong(dst, f, f, tmp);
+}
+
+APContext.prototype.sqrt = function(dst, f, tmp = null) {
+  if (isNaN(f)) { dst[I_FLAGS] = FLAGS.NAN; return dst }
+  if (isZero(f)) { dst[I_FLAGS] = FLAGS.POS_ZERO; return dst; }
+  if (isInf(f)) { dst[I_FLAGS] = isNeg(f) ? FLAGS.NEG_INF : FLAGS.POS_INF; return dst; }
+
+  if (dst === f) {
+    f = new Int32Array(dst);
+  }
+
+  if (isNeg(f)) throw new Error('Cannot call sqrt() on a negative number');
+
+  dst[I_FLAGS] = FLAGS.POS_NORMAL;
+
+  dst.set(f);
+  // halve exponent to create initial estimate
+  dst[I_EXP] = Math.floor(dst[I_EXP] / 2);
+
+  if (!tmp) { tmp = this.alloc(); }
+
+  for (let i = 0; i < Math.floor(Math.log2(this.prec)) + 10; i++) {
+    this.add(tmp, dst, this.div(tmp, f, dst));
+    tmp[I_EXP]--; // divide by 2
+    dst.set(tmp);
+  }
+  return dst;
+}
 
 // Converts a non-negative BigInt into the flat-array float format.
 // value = val * 2^adjExp (adjExp applied by caller after this returns, default 0)

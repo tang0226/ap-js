@@ -1357,3 +1357,202 @@ new TestSuite('div()', {
   },
 
 }).runTests();
+
+// ─── sq ──────────────────────────────────────────────────────────────────────
+
+new TestSuite('sq()', {
+
+  // special values
+  'sq(NaN) = NaN': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('NaN'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'sq(0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'sq(-0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('-0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'sq(Inf) = Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  'sq(-Inf) = Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('-Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  // basic arithmetic
+  'sq(1) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('1'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'sq(2) = 4': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('2'));
+    assertEqual(ctx.toString(dst), '4');
+  },
+
+  'sq(3) = 9': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('3'));
+    assertEqual(ctx.toString(dst), '9');
+  },
+
+  'sq(0.5) = 0.25': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('0.5'));
+    assertEqual(ctx.toString(dst), '0.25');
+  },
+
+  'sq(-2) = 4': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('-2'));
+    assertEqual(ctx.toString(dst), '4');
+  },
+
+  'sq(-3) = 9': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sq(dst, ctx.ap('-3'));
+    assertEqual(ctx.toString(dst), '9');
+  },
+
+  // aliasing
+  'dst === f': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('3');
+    ctx.sq(f, f);
+    assertEqual(ctx.toString(f), '9');
+  },
+
+  // inverse: sq(sqrt(n)) for exact cases
+  'sq(sqrt(4)) = 4': () => {
+    const ctx = new APContext(64), dst = ctx.ap(), tmp = ctx.ap();
+    ctx.sqrt(tmp, ctx.ap('4'));
+    ctx.sq(dst, tmp);
+    assertEqual(ctx.toString(dst, 6), '4.00000');
+  },
+
+}).runTests();
+
+// ─── sqrt ────────────────────────────────────────────────────────────────────
+
+new TestSuite('sqrt()', {
+
+  // special values
+  'sqrt(NaN) = NaN': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('NaN'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'sqrt(0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'sqrt(-0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('-0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'sqrt(Inf) = Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  'sqrt(negative) throws': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    assertThrows(() => ctx.sqrt(dst, ctx.ap('-1')), 'Cannot call sqrt() on a negative number');
+  },
+
+  // exact integer squares
+  'sqrt(1) = 1': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('1'));
+    assertEqual(ctx.toString(dst, 18), '1.' + '0'.repeat(17));
+  },
+
+  'sqrt(4) = 2': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('4'));
+    assertEqual(ctx.toString(dst, 18), '2.' + '0'.repeat(17));
+  },
+
+  'sqrt(9) = 3': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('9'));
+    assertEqual(ctx.toString(dst, 18), '3');
+  },
+
+  'sqrt(16) = 4': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('16'));
+    assertEqual(ctx.toString(dst, 18), '4.' + '0'.repeat(17));
+  },
+
+  // exact fractions
+  'sqrt(0.25) = 0.5': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('0.25'));
+    assertEqual(ctx.toString(dst, 18), '0.5' + '0'.repeat(17));
+  },
+
+  'sqrt(0.0625) = 0.25': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('0.0625'));
+    assertEqual(ctx.toString(dst, 18), '0.25' + '0'.repeat(16));
+  },
+
+  // aliasing: dst === f
+  'dst === f': () => {
+    const ctx = new APContext(64);
+    const f = ctx.ap('4');
+    ctx.sqrt(f, f);
+    assertEqual(ctx.toString(f, 18), '2.' + '0'.repeat(17));
+  },
+
+  // accuracy
+  'sqrt(2) at prec=64 has ~18 correct digits': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('2'));
+    assertTruthy(ctx.toString(dst).startsWith('1.41421356237309504'));
+  },
+
+  'sqrt(2) at prec=128 has ~36 correct digits': () => {
+    const ctx = new APContext(128), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('2'));
+    assertTruthy(ctx.toString(dst).startsWith('1.41421356237309504880168872420969807'));
+  },
+
+  'sqrt(3) at prec=64 has ~18 correct digits': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.sqrt(dst, ctx.ap('3'));
+    assertTruthy(ctx.toString(dst).startsWith('1.73205080756887729'));
+  },
+
+  // inverse: sqrt(sq(n)) = n for exact cases
+  'sqrt(sq(3)) = 3': () => {
+    const ctx = new APContext(64), dst = ctx.ap(), tmp = ctx.ap();
+    ctx.sq(tmp, ctx.ap('3'));
+    ctx.sqrt(dst, tmp);
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+}).runTests();

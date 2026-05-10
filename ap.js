@@ -25,8 +25,7 @@ const isNaN    = (f) => f[I_FLAGS] === 6;
 
 
 export class APContext {
-  constructor(prec, guard = 16) {
-    this.guard    = guard;
+  constructor(prec) {
     this.numLimbs = Math.ceil(prec / LIMB_BITS);
     this.prec     = this.numLimbs * LIMB_BITS;
     this.size     = HDR + this.numLimbs;
@@ -131,11 +130,13 @@ APContext.prototype.fromString = function(dst, s) {
     // Exact: multiply sig by the decimal shift
     _setFromBigInt(dst, sig * (10n ** BigInt(decExp)), neg, this.prec, this.numLimbs);
   } else {
-    // Scale up by 2^(prec+guard) before integer division to preserve binary bits
-    const shift  = this.prec + this.guard;
-    const scaled = (sig << BigInt(shift)) / (10n ** BigInt(-decExp));
-    _setFromBigInt(dst, scaled, neg, this.prec, this.numLimbs);
-    dst[I_EXP] -= shift;
+    const denom   = 10n ** BigInt(-decExp);
+    const scaled  = (sig << BigInt(this.prec)) / denom;
+    const rem     = (sig << BigInt(this.prec)) % denom;
+    const twice   = rem * 2n;
+    const roundUp = twice > denom || (twice === denom && (scaled & 1n) === 1n);
+    _setFromBigInt(dst, roundUp ? scaled + 1n : scaled, neg, this.prec, this.numLimbs);
+    dst[I_EXP] -= this.prec;
   }
 };
 
@@ -348,13 +349,13 @@ APContext.prototype.mulLong = function(dst, a, b) {
 
   let diffSign = (a[I_FLAGS] & 1) ^ (b[I_FLAGS] & 1);
 
-  if (aZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
-  if (bZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return; }
-  if (aInf && !bInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
-  if (bInf && !aInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return }
+  if (aZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return dst; }
+  if (bZero) { dst[I_FLAGS] = FLAGS.POS_ZERO + diffSign; return dst; }
+  if (aInf && !bInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return dst; }
+  if (bInf && !aInf) { dst[I_FLAGS] = FLAGS.POS_INF + diffSign; return dst; }
   if (aInf && bInf) {
     dst[I_FLAGS] = FLAGS.POS_INF + diffSign;
-    return;
+    return dst;
   }
 
 
@@ -424,12 +425,13 @@ APContext.prototype.mulLong = function(dst, a, b) {
   let roundBit = shiftIn >>> (offset - 1);
   if (roundBit) {
     let i = this.size - 1;
-    while (++dst[i] >= LIMB_BASE && i >= HDR) {
+    while (i >= HDR && ++dst[i] >= LIMB_BASE) {
       dst[i] = 0;
       i--;
     }
     if (i < HDR) { // Carry reached past MSL; set first bit of first limb to 1; all else is 0'ed out
       dst[HDR] = LIMB_BASE >>> 1;
+      dst[I_EXP]++;
     }
   }
 
@@ -496,7 +498,7 @@ APContext.prototype.sqrt = function(dst, f, tmp = null) {
 
   if (!tmp) { tmp = this.alloc(); }
 
-  for (let i = 0; i < Math.floor(Math.log2(this.prec)) + 10; i++) {
+  for (let i = 0; i < Math.floor(Math.log2(this.prec)) + 1; i++) {
     this.add(tmp, dst, this.div(tmp, f, dst));
     tmp[I_EXP]--; // divide by 2
     dst.set(tmp);

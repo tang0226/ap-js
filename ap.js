@@ -17,7 +17,7 @@ const FLAGS = {
   NAN:        6,
 };
 
-const isNeg    = (f) => f[I_FLAGS] & 1;
+const isNeg    = (f) => !!(f[I_FLAGS] & 1);
 const isNormal = (f) => f[I_FLAGS] === 2 || f[I_FLAGS] === 3;
 const isZero   = (f) => f[I_FLAGS] <= 1;
 const isInf    = (f) => f[I_FLAGS] === 4 || f[I_FLAGS] === 5;
@@ -144,6 +144,123 @@ APContext.prototype.fromString = function(dst, s) {
 
 APContext.prototype.toNumber = function(f) {
   return Number(this.toString(f));
+};
+
+APContext.prototype.equals =
+APContext.prototype.eq = function(a, b) {
+  if (a[I_FLAGS] === FLAGS.NAN || b[I_FLAGS] === FLAGS.NAN) return false;
+  if (isInf(a) && isInf(b)) { return a[I_FLAGS] === b[I_FLAGS]; }
+  if (isInf(a) || isInf(b)) { return false; }
+  if (isZero(a) && isZero(b)) { return true; }
+  if (isZero(a) || isZero(b)) { return false; }
+
+  if ((a[I_FLAGS] & 1) !== (b[I_FLAGS] & 1)) { return false; }
+
+  if (a[I_EXP] !== b[I_EXP]) { return false; }
+  for (let i = HDR; i < this.size; i++) {
+    if (a[i] !== b[i]) { return false; }
+  }
+  return true;
+};
+
+APContext.prototype.gt = function(a, b) {
+  if (a[I_FLAGS] === FLAGS.NAN || b[I_FLAGS] === FLAGS.NAN) return false;
+  if (a[I_FLAGS] === FLAGS.NEG_INF || b[I_FLAGS] === FLAGS.POS_INF) { return false; }
+  if (a[I_FLAGS] === FLAGS.POS_INF) { return b[I_FLAGS] !== FLAGS.POS_INF; }
+  if (b[I_FLAGS] === FLAGS.NEG_INF) { return a[I_FLAGS] !== FLAGS.NEG_INF; }
+  if (isZero(a)) { return isNeg(b) && !isZero(b); }
+  if (isZero(b)) { return !isNeg(a); }
+  if (!isNeg(a) && isNeg(b)) { return true; }
+  if (isNeg(a) && !isNeg(b)) { return false; }
+  let aMantissaLarger = a[I_EXP] > b[I_EXP];
+  if (a[I_EXP] === b[I_EXP]) {
+    let i;
+    for (i = HDR; i < this.size; i++) {
+      if (a[i] > b[i]) { aMantissaLarger = true; break; }
+      else if (a[i] < b[i]) { break; }
+    }
+
+    if (i === this.size) { return false; }
+  }
+
+  return isNeg(a) !== aMantissaLarger;
+};
+
+APContext.prototype.lt = function(a, b) {
+  if (a[I_FLAGS] === FLAGS.NAN || b[I_FLAGS] === FLAGS.NAN) return false;
+  if (a[I_FLAGS] === FLAGS.POS_INF || b[I_FLAGS] === FLAGS.NEG_INF) { return false; }
+  if (a[I_FLAGS] === FLAGS.NEG_INF) { return b[I_FLAGS] !== FLAGS.NEG_INF; }
+  if (b[I_FLAGS] === FLAGS.POS_INF) { return a[I_FLAGS] !== FLAGS.POS_INF; }
+  if (isZero(a)) { return !isNeg(b) && !isZero(b); }
+  if (isZero(b)) { return isNeg(a); }
+  if (isNeg(a) && !isNeg(b)) { return true; }
+  if (!isNeg(a) && isNeg(b)) { return false; }
+  let aMantissaSmaller = a[I_EXP] < b[I_EXP];
+  if (a[I_EXP] === b[I_EXP]) {
+    let i;
+    for (i = HDR; i < this.size; i++) {
+      if (a[i] < b[i]) { aMantissaSmaller = true; break; }
+      else if (a[i] > b[i]) { break; }
+    }
+
+    if (i === this.size) { return false; }
+  }
+
+  return isNeg(a) !== aMantissaSmaller;
+};
+
+APContext.prototype.gte = function(a, b) {
+  if (a[I_FLAGS] === FLAGS.NAN || b[I_FLAGS] === FLAGS.NAN) return false;
+  if (a[I_FLAGS] === b[I_FLAGS]) {
+    if (isInf(a)) { return true; }
+    if (isZero(a)) { return true; }
+  }
+  if (a[I_FLAGS] === FLAGS.POS_INF || b[I_FLAGS] === FLAGS.NEG_INF) { return true; }
+  if (a[I_FLAGS] === FLAGS.NEG_INF || b[I_FLAGS] === FLAGS.POS_INF) { return false; }
+  if (isZero(a)) { return isNeg(b) || isZero(b); }
+  if (isZero(b)) { return !isNeg(a); }
+  if (!isNeg(a) && isNeg(b)) { return true; }
+  if (isNeg(a) && !isNeg(b)) { return false; }
+
+  let aMantissaLarger = a[I_EXP] > b[I_EXP];
+  if (a[I_EXP] === b[I_EXP]) {
+    let i;
+    for (i = HDR; i < this.size; i++) {
+      if (a[i] > b[i]) { aMantissaLarger = true; break; }
+      else if (a[i] < b[i]) { break; }
+    }
+
+    if (i === this.size) { return true; }
+  }
+
+  return isNeg(a) !== aMantissaLarger;
+};
+
+APContext.prototype.lte = function(a, b) {
+  if (a[I_FLAGS] === FLAGS.NAN || b[I_FLAGS] === FLAGS.NAN) return false;
+  if (a[I_FLAGS] === b[I_FLAGS]) {
+    if (isInf(a)) { return true; }
+    if (isZero(a)) { return true; }
+  }
+  if (a[I_FLAGS] === FLAGS.NEG_INF || b[I_FLAGS] === FLAGS.POS_INF) { return true; }
+  if (a[I_FLAGS] === FLAGS.POS_INF || b[I_FLAGS] === FLAGS.NEG_INF) { return false; }
+  if (isZero(a)) { return !isNeg(b) || isZero(b); }
+  if (isZero(b)) { return isNeg(a); }
+  if (isNeg(a) && !isNeg(b)) { return true; }
+  if (!isNeg(a) && isNeg(b)) { return false; }
+
+  let aMantissaSmaller = a[I_EXP] < b[I_EXP];
+  if (a[I_EXP] === b[I_EXP]) {
+    let i;
+    for (i = HDR; i < this.size; i++) {
+      if (a[i] < b[i]) { aMantissaSmaller = true; break; }
+      else if (a[i] > b[i]) { break; }
+    }
+
+    if (i === this.size) { return true; }
+  }
+
+  return isNeg(a) !== aMantissaSmaller;
 };
 
 APContext.prototype.trunc = function(dst, f) {

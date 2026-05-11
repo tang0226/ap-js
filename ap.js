@@ -31,7 +31,9 @@ export class APContext {
     this.size     = HDR + this.numLimbs;
 
     // Constants
-    this.n2 = this.alloc(2);
+    this.one = this.alloc(1);
+    this.two = this.alloc(2);
+    this.negOne = this.alloc(-1);
   }
 }
 
@@ -142,6 +144,177 @@ APContext.prototype.fromString = function(dst, s) {
 
 APContext.prototype.toNumber = function(f) {
   return Number(this.toString(f));
+};
+
+APContext.prototype.trunc = function(dst, f) {
+  if (dst !== f) { dst.set(f); }
+
+  if (dst[I_FLAGS] !== FLAGS.POS_NORMAL && dst[I_FLAGS] !== FLAGS.NEG_NORMAL) return dst;
+  
+  if (dst[I_EXP] <= 0) {
+    dst[I_FLAGS] = isNeg(dst) ? FLAGS.NEG_ZERO : FLAGS.POS_ZERO;
+    return dst;
+  }
+
+  const startI = HDR + Math.floor(dst[I_EXP] / LIMB_BITS);
+  const invOffset = LIMB_BITS - (dst[I_EXP] % LIMB_BITS);
+
+  dst[startI] = (dst[startI] >>> invOffset) << invOffset;
+
+  for (let i = startI + 1; i < this.size; i++) { dst[i] = 0; }
+  return dst;
+};
+
+APContext.prototype.floor = function(dst, f) {
+  if (dst !== f) { dst.set(f); }
+
+  // NaN, zero, and infinity all remain unaltered
+  if (dst[I_FLAGS] !== FLAGS.POS_NORMAL && dst[I_FLAGS] !== FLAGS.NEG_NORMAL) {
+    return dst;
+  }
+
+  if (dst[I_EXP] <= 0) {
+    if (isNeg(dst)) {
+      dst.set(this.negOne);
+    } else {
+      dst[I_FLAGS] = FLAGS.POS_ZERO;
+    }
+    return dst;
+  }
+
+  if (dst[I_EXP] >= this.prec) { return dst; }
+
+  const startI = HDR + Math.floor(dst[I_EXP] / LIMB_BITS);
+  const offset = dst[I_EXP] % LIMB_BITS;
+  const invOffset = LIMB_BITS - offset;
+  
+  let roundBit = 0;
+  if (isNeg(dst)) {
+    roundBit = +Boolean(dst[startI] & ((1 << invOffset) - 1));
+    for (let i = startI + 1; i < this.size; i++) {
+      if (dst[i]) { roundBit = 1; break; }
+    }
+  }
+
+  // Zero out everything after the decimal point.
+  dst[startI] = (dst[startI] >>> invOffset) << invOffset;
+  for (let i = startI + 1; i < this.size; i++) { dst[i] = 0; }
+
+  if (roundBit) {
+    dst[startI] += (1 << invOffset);
+    if (dst[startI] >= LIMB_BASE) {
+      dst[startI] -= LIMB_BASE;
+      let i = startI - 1;
+      while (i >= HDR && ++dst[i] >= LIMB_BASE) {
+        dst[i] = 0;
+        i--;
+      }
+      if (i < HDR) { // overflow
+        dst[HDR] = LIMB_BASE >>> 1;
+        dst[I_EXP]++;
+      }
+    }
+  }
+
+  return dst;
+};
+
+APContext.prototype.ceil = function(dst, f) {
+  if (dst !== f) { dst.set(f); }
+
+  // NaN, zero, and infinity all remain unaltered
+  if (dst[I_FLAGS] !== FLAGS.POS_NORMAL && dst[I_FLAGS] !== FLAGS.NEG_NORMAL) {
+    return dst;
+  }
+
+  if (dst[I_EXP] <= 0) {
+    if (isNeg(dst)) {
+      dst[I_FLAGS] = FLAGS.NEG_ZERO;
+    } else {
+      dst.set(this.one);
+    }
+    return dst;
+  }
+
+  if (dst[I_EXP] >= this.prec) { return dst; }
+
+  const startI = HDR + Math.floor(dst[I_EXP] / LIMB_BITS);
+  const offset = dst[I_EXP] % LIMB_BITS;
+  const invOffset = LIMB_BITS - offset;
+  
+  let roundBit = 0;
+  if (!isNeg(dst)) {
+    roundBit = +Boolean(dst[startI] & ((1 << invOffset) - 1));
+    for (let i = startI + 1; i < this.size; i++) {
+      if (dst[i]) { roundBit = 1; break; }
+    }
+  }
+
+  // Zero out everything after the decimal point.
+  dst[startI] = (dst[startI] >>> invOffset) << invOffset;
+  for (let i = startI + 1; i < this.size; i++) { dst[i] = 0; }
+
+  if (roundBit) {
+    dst[startI] += (1 << invOffset);
+    if (dst[startI] >= LIMB_BASE) {
+      dst[startI] -= LIMB_BASE;
+      let i = startI - 1;
+      while (i >= HDR && ++dst[i] >= LIMB_BASE) {
+        dst[i] = 0;
+        i--;
+      }
+      if (i < HDR) { // overflow
+        dst[HDR] = LIMB_BASE >>> 1;
+        dst[I_EXP]++;
+      }
+    }
+  }
+
+  return dst;
+};
+
+APContext.prototype.round = function(dst, f) {
+  if (dst !== f) { dst.set(f); }
+
+  if (dst[I_FLAGS] !== FLAGS.POS_NORMAL && dst[I_FLAGS] !== FLAGS.NEG_NORMAL) { return dst; }
+
+  if (dst[I_EXP] <= 0) {
+    if (dst[I_EXP] === 0) {
+      dst.set(isNeg(dst) ? this.negOne : this.one); // round away from zero
+    } else {
+      dst[I_FLAGS] = isNeg(dst) ? FLAGS.NEG_ZERO : FLAGS.POS_ZERO; // round to zero
+    }
+    return dst;
+  }
+
+  if (dst[I_EXP] >= this.prec) { return dst; }
+
+  const startI = HDR + Math.floor(dst[I_EXP] / LIMB_BITS);
+  const invOffset = LIMB_BITS - (dst[I_EXP] % LIMB_BITS);
+  
+  let roundBit = dst[startI] & (1 << (invOffset - 1));
+
+  // Zero out after dp
+  dst[startI] = (dst[startI] >>> invOffset) << invOffset;
+  for (let i = startI + 1; i < this.size; i++) { dst[i] = 0; }
+
+  if (roundBit) {
+    dst[startI] += (1 << invOffset);
+    if (dst[startI] >= LIMB_BASE) {
+      dst[startI] -= LIMB_BASE;
+      let i = startI - 1;
+      while (i >= HDR && ++dst[i] >= LIMB_BASE) {
+        dst[i] = 0;
+        i--;
+      }
+      if (i < HDR) { // overflow
+        dst[HDR] = LIMB_BASE >>> 1;
+        dst[I_EXP]++;
+      }
+    }
+  }
+
+  return dst;
 };
 
 APContext.prototype.neg = function(dst, f) {
@@ -464,7 +637,7 @@ APContext.prototype.recip = function(dst, d, tmp = null) {
   }
 
   for (let i = 0; i < Math.floor(Math.log2(this.prec)) + 2; i++) {
-    this.mulLong(tmp, dst, this.sub(tmp, this.n2, this.mulLong(tmp, d, dst)));
+    this.mulLong(tmp, dst, this.sub(tmp, this.two, this.mulLong(tmp, d, dst)));
     dst.set(tmp);
   }
   return dst;

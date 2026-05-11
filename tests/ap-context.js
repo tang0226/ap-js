@@ -1556,3 +1556,730 @@ new TestSuite('sqrt()', {
   },
 
 }).runTests();
+
+// ─── trunc ───────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext trunc()', {
+
+  // special values pass through unchanged
+  'trunc(NaN) = NaN': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('NaN'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'trunc(+0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'trunc(-0) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-0'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  'trunc(+Inf) = +Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  'trunc(-Inf) = -Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  // exp <= 0: pure fraction → ±0 (sign preserved)
+  'trunc(0.5) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('0.5'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'trunc(0.75) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('0.75'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'trunc(-0.5) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-0.5'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  'trunc(-0.75) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-0.75'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  // already integers (no fractional bits → unchanged)
+  'trunc(1) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('1'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'trunc(-1) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-1'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'trunc(2) = 2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('2'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'trunc(-2) = -2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-2'));
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  'trunc(65536) = 65536 (exp >= prec, all bits integer)': () => {
+    const ctx = new APContext(16), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('65536'));
+    assertEqual(ctx.toString(dst), '65536');
+  },
+
+  // positive with fractional (zeroes fraction, rounds toward 0 — no carry ever)
+  'trunc(1.5) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('1.5'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'trunc(1.25) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('1.25'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'trunc(3.75) = 3': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('3.75'));
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+  // negative with fractional (zeroes fraction, rounds toward 0 — symmetric with positive)
+  'trunc(-1.5) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-1.5'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'trunc(-1.25) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-1.25'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'trunc(-3.75) = -3': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-3.75'));
+    assertEqual(ctx.toString(dst), '-3');
+  },
+
+  // multi-limb (startI > HDR)
+  'trunc(65537.5) = 65537': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('65537.5'));
+    assertEqual(ctx.toString(dst), '65537');
+  },
+
+  'trunc(-65537.5) = -65537': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.trunc(dst, ctx.ap('-65537.5'));
+    assertEqual(ctx.toString(dst), '-65537');
+  },
+
+  // in-place aliasing
+  'in-place trunc(f, f) positive': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('3.75');
+    ctx.trunc(f, f);
+    assertEqual(ctx.toString(f), '3');
+  },
+
+  'in-place trunc(f, f) negative': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('-3.75');
+    ctx.trunc(f, f);
+    assertEqual(ctx.toString(f), '-3');
+  },
+
+}).runTests();
+
+// ─── floor ───────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext floor()', {
+
+  // special values pass through unchanged
+  'floor(NaN) = NaN': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('NaN'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'floor(+0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'floor(-0) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-0'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  'floor(+Inf) = +Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  'floor(-Inf) = -Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  // positive integers (exp >= prec or no fractional bits → unchanged)
+  'floor(1) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('1'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'floor(2) = 2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('2'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'floor(65536) = 65536 (exp >= prec, early return)': () => {
+    const ctx = new APContext(16), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('65536'));
+    assertEqual(ctx.toString(dst), '65536');
+  },
+
+  // positive with fractional part (truncates toward zero)
+  'floor(1.5) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('1.5'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'floor(1.25) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('1.25'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'floor(3.75) = 3': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('3.75'));
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+  // positive, exp <= 0 → result is +0
+  'floor(0.5) = 0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('0.5'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'floor(0.75) = 0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('0.75'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  // negative integers (no fractional bits → unchanged)
+  'floor(-1) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-1'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'floor(-2) = -2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-2'));
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  // negative, exp <= 0 → result is -1
+  'floor(-0.5) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-0.5'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'floor(-0.75) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-0.75'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  // negative with fractional, round-up CARRIES (integer part of startI is all 1s)
+  'floor(-1.5) = -2 (carry propagates through MSL, exp increments)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-1.5'));
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  'floor(-3.5) = -4 (carry: 2-bit integer all 1s)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-3.5'));
+    assertEqual(ctx.toString(dst), '-4');
+  },
+
+  // negative with fractional, round-up does NOT carry (regression: spurious while-loop bug)
+  'floor(-2.5) = -3 (no carry from rounding)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-2.5'));
+    assertEqual(ctx.toString(dst), '-3');
+  },
+
+  'floor(-5.5) = -6 (no carry from rounding)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-5.5'));
+    assertEqual(ctx.toString(dst), '-6');
+  },
+
+  'floor(-5.25) = -6': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-5.25'));
+    assertEqual(ctx.toString(dst), '-6');
+  },
+
+  // multi-limb negative (startI > HDR); -65537.5 has integer bit set in startI → carry
+  'floor(-65537.5) = -65538 (carry, startI > HDR)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-65537.5'));
+    assertEqual(ctx.toString(dst), '-65538');
+  },
+
+  // multi-limb negative; -65538.5 has integer bit 0 in startI → no carry (regression)
+  'floor(-65538.5) = -65539 (no carry, startI > HDR regression)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.floor(dst, ctx.ap('-65538.5'));
+    assertEqual(ctx.toString(dst), '-65539');
+  },
+
+  // in-place aliasing
+  'in-place floor(f, f) positive': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('3.75');
+    ctx.floor(f, f);
+    assertEqual(ctx.toString(f), '3');
+  },
+
+  'in-place floor(f, f) negative': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('-2.5');
+    ctx.floor(f, f);
+    assertEqual(ctx.toString(f), '-3');
+  },
+
+}).runTests();
+
+// ─── ceil ────────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext ceil()', {
+
+  // special values pass through unchanged
+  'ceil(NaN) = NaN': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('NaN'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'ceil(+0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'ceil(-0) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-0'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  'ceil(+Inf) = +Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  'ceil(-Inf) = -Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  // negative integers (no fractional bits → unchanged)
+  'ceil(-1) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-1'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'ceil(-2) = -2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-2'));
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  // negative with fractional (truncates toward 0, no rounding needed)
+  'ceil(-1.5) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-1.5'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'ceil(-1.25) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-1.25'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'ceil(-3.75) = -3': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-3.75'));
+    assertEqual(ctx.toString(dst), '-3');
+  },
+
+  // negative, exp <= 0 → -0
+  'ceil(-0.5) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-0.5'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  'ceil(-0.75) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('-0.75'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  // positive integers (exp >= prec or no fractional bits → unchanged)
+  'ceil(1) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('1'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'ceil(2) = 2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('2'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'ceil(65536) = 65536 (exp >= prec, early return)': () => {
+    const ctx = new APContext(16), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('65536'));
+    assertEqual(ctx.toString(dst), '65536');
+  },
+
+  // positive, exp <= 0 → +1
+  'ceil(0.5) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('0.5'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'ceil(0.75) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('0.75'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  // positive with fractional, round-up CARRIES (integer part of startI is all 1s)
+  'ceil(1.5) = 2 (carry propagates through MSL, exp increments)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('1.5'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'ceil(3.5) = 4 (carry: 2-bit integer part all 1s)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('3.5'));
+    assertEqual(ctx.toString(dst), '4');
+  },
+
+  // positive with fractional, round-up does NOT carry (regression: spurious while-loop)
+  'ceil(2.5) = 3 (no carry from rounding)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('2.5'));
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+  'ceil(5.5) = 6 (no carry from rounding)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('5.5'));
+    assertEqual(ctx.toString(dst), '6');
+  },
+
+  'ceil(5.25) = 6': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('5.25'));
+    assertEqual(ctx.toString(dst), '6');
+  },
+
+  // multi-limb positive (startI > HDR); 65537.5 has integer bit set in startI → carry
+  'ceil(65537.5) = 65538 (carry, startI > HDR)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('65537.5'));
+    assertEqual(ctx.toString(dst), '65538');
+  },
+
+  // multi-limb positive; 65538.5 has integer bit 0 in startI → no carry (regression)
+  'ceil(65538.5) = 65539 (no carry, startI > HDR regression)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.ceil(dst, ctx.ap('65538.5'));
+    assertEqual(ctx.toString(dst), '65539');
+  },
+
+  // in-place aliasing
+  'in-place ceil(f, f) positive': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('3.75');
+    ctx.ceil(f, f);
+    assertEqual(ctx.toString(f), '4');
+  },
+
+  'in-place ceil(f, f) negative': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('-2.5');
+    ctx.ceil(f, f);
+    assertEqual(ctx.toString(f), '-2');
+  },
+
+}).runTests();
+
+// ─── round ───────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext round()', {
+
+  // special values pass through unchanged
+  'round(NaN) = NaN': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('NaN'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'round(+0) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('0'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'round(-0) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-0'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  'round(+Inf) = +Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_INF);
+  },
+
+  'round(-Inf) = -Inf': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-Infinity'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_INF);
+  },
+
+  // exp < 0: |value| < 0.5, rounds to ±0
+  'round(0.25) = +0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('0.25'));
+    assertEqual(dst[I_FLAGS], FLAGS.POS_ZERO);
+  },
+
+  'round(-0.25) = -0': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-0.25'));
+    assertEqual(dst[I_FLAGS], FLAGS.NEG_ZERO);
+  },
+
+  // exp = 0: value in [0.5, 1), rounds away from zero to ±1
+  'round(0.5) = 1 (half rounds away from zero)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('0.5'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'round(0.75) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('0.75'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'round(-0.5) = -1 (half rounds away from zero)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-0.5'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'round(-0.75) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-0.75'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  // already integers (exp >= prec → unchanged)
+  'round(1) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('1'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'round(-1) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-1'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'round(65536) = 65536 (exp >= prec, early return)': () => {
+    const ctx = new APContext(16), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('65536'));
+    assertEqual(ctx.toString(dst), '65536');
+  },
+
+  // positive, fraction < 0.5 (half-bit clear → no rounding)
+  'round(1.25) = 1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('1.25'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'round(2.25) = 2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('2.25'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  // positive, fraction >= 0.5, round-up CARRIES (integer part all 1s in startI)
+  'round(1.5) = 2 (carry: 1-bit integer all 1s, exp increments)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('1.5'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'round(3.5) = 4 (carry: 2-bit integer all 1s)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('3.5'));
+    assertEqual(ctx.toString(dst), '4');
+  },
+
+  // positive, fraction >= 0.5, round-up does NOT carry
+  'round(2.5) = 3 (no carry)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('2.5'));
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+  'round(5.5) = 6 (no carry)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('5.5'));
+    assertEqual(ctx.toString(dst), '6');
+  },
+
+  'round(5.75) = 6': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('5.75'));
+    assertEqual(ctx.toString(dst), '6');
+  },
+
+  // negative, |fraction| < 0.5 (half-bit clear → no rounding)
+  'round(-1.25) = -1': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-1.25'));
+    assertEqual(ctx.toString(dst), '-1');
+  },
+
+  'round(-2.25) = -2': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-2.25'));
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  // negative, |fraction| >= 0.5, round-up CARRIES (away from zero)
+  'round(-1.5) = -2 (carry: 1-bit integer all 1s, exp increments)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-1.5'));
+    assertEqual(ctx.toString(dst), '-2');
+  },
+
+  'round(-3.5) = -4 (carry: 2-bit integer all 1s)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-3.5'));
+    assertEqual(ctx.toString(dst), '-4');
+  },
+
+  // negative, |fraction| >= 0.5, round-up does NOT carry
+  'round(-2.5) = -3 (no carry)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-2.5'));
+    assertEqual(ctx.toString(dst), '-3');
+  },
+
+  'round(-5.5) = -6 (no carry)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-5.5'));
+    assertEqual(ctx.toString(dst), '-6');
+  },
+
+  // multi-limb (startI > HDR)
+  'round(65537.5) = 65538 (carry, startI > HDR)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('65537.5'));
+    assertEqual(ctx.toString(dst), '65538');
+  },
+
+  'round(65538.5) = 65539 (no carry, startI > HDR)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('65538.5'));
+    assertEqual(ctx.toString(dst), '65539');
+  },
+
+  'round(-65537.5) = -65538 (carry, startI > HDR)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-65537.5'));
+    assertEqual(ctx.toString(dst), '-65538');
+  },
+
+  'round(-65538.5) = -65539 (no carry, startI > HDR)': () => {
+    const ctx = new APContext(32), dst = ctx.ap();
+    ctx.round(dst, ctx.ap('-65538.5'));
+    assertEqual(ctx.toString(dst), '-65539');
+  },
+
+  // in-place aliasing
+  'in-place round(f, f) positive': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('2.5');
+    ctx.round(f, f);
+    assertEqual(ctx.toString(f), '3');
+  },
+
+  'in-place round(f, f) negative': () => {
+    const ctx = new APContext(32);
+    const f = ctx.ap('-2.5');
+    ctx.round(f, f);
+    assertEqual(ctx.toString(f), '-3');
+  },
+
+}).runTests();

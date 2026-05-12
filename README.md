@@ -1,5 +1,9 @@
 A basic JS arbitrary-precision library
 
+Another "failed" experiment. Failed, as in, it's at least 20x slower than just using JS BigInt.
+
+Still learned a ton from making it, though. And porting this over to WebGL will still be fast.
+
 Architecture considerations for future development:
 | Type        |	Max value            |	Max safe n                        |
 |-------------|----------------------|------------------------------------|

@@ -765,8 +765,8 @@ APContext.prototype.div = function(dst, a, b, tmp = null) {
   return this.mulLong(dst, a, this.recip(tmp, b));
 };
 
-APContext.prototype.sq = function(dst, f, tmp = null) {
-  return this.mulLong(dst, f, f, tmp);
+APContext.prototype.sq = function(dst, f) {
+  return this.mulLong(dst, f, f);
 }
 
 APContext.prototype.sqrt = function(dst, f, tmp = null) {

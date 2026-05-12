@@ -796,6 +796,19 @@ APContext.prototype.sqrt = function(dst, f, tmp = null) {
   return dst;
 }
 
+APContext.prototype.mod = function(dst, a, b, tmp = null) {
+  if (isNaN(a) || isNaN(b) || isZero(b)) { dst[I_FLAGS] = FLAGS.NAN; return dst; }
+
+  if (!tmp) { tmp = this.alloc(); }
+  this.floor(tmp, this.div(tmp, a, b));  // tmp = floor(a/b)
+  this.mul(tmp, b, tmp);                 // tmp = b * floor(a/b)
+  this.sub(dst, a, tmp);                 // dst = a - b*floor(a/b)
+  // Correct for ±1 floor error caused by Newton-Raphson rounding in div
+  if (isNeg(dst) && !isZero(dst)) { this.add(dst, dst, b); }
+  else if (this.gte(dst, b)) { this.sub(dst, dst, b); }
+  return dst;
+};
+
 // Converts a non-negative BigInt into the flat-array float format.
 // value = val * 2^adjExp (adjExp applied by caller after this returns, default 0)
 function _setFromBigInt(dst, val, neg, prec, numLimbs) {

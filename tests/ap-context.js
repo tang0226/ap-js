@@ -1,6 +1,6 @@
 import { TestSuite } from '../assert-js/test-suite.js';
 import { assertEqual, assertNotEqual, assert, assertInstance, assertThrows, assertTruthy, assertFalsy } from '../assert-js/assert.js';
-import { APContext, FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS } from '../ap.js';
+import { APContext, FLAGS, I_PREC, I_FLAGS, I_EXP, HDR, LIMB_BITS, isZero } from '../ap.js';
 
 // ─── constructor ─────────────────────────────────────────────────────────────
 
@@ -2832,6 +2832,139 @@ new TestSuite('APContext sqrt()', {
     ctx.sq(tmp, ctx.ap('3'));
     ctx.sqrt(dst, tmp);
     assertEqual(ctx.toString(dst), '3');
+  },
+
+}).runTests();
+
+// ─── mod ─────────────────────────────────────────────────────────────────────
+
+new TestSuite('APContext mod()', {
+
+  // special values
+  'mod(NaN, 1) = NaN': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('NaN'), ctx.ap('1'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'mod(1, NaN) = NaN': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('1'), ctx.ap('NaN'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'mod(0, 3) = 0': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('0'), ctx.ap('3'));
+    assertTruthy(isZero(dst));
+  },
+
+  'mod(Inf, 3) = NaN': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('Infinity'), ctx.ap('3'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  'mod(1, 0) = NaN': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('1'), ctx.ap('0'));
+    assertEqual(dst[I_FLAGS], FLAGS.NAN);
+  },
+
+  // basic positive integers
+  'mod(7, 3) = 1': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('7'), ctx.ap('3'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'mod(10, 3) = 1': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('10'), ctx.ap('3'));
+    assertEqual(ctx.toString(dst), '1');
+  },
+
+  'mod(3, 7) = 3 (a < b)': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('3'), ctx.ap('7'));
+    assertEqual(ctx.toString(dst), '3');
+  },
+
+  // exactly divisible — most likely to trigger the correction step
+  'mod(9, 3) = 0': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('9'), ctx.ap('3'));
+    assertTruthy(isZero(dst));
+  },
+
+  'mod(6, 2) = 0': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('6'), ctx.ap('2'));
+    assertTruthy(isZero(dst));
+  },
+
+  'mod(100, 10) = 0': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('100'), ctx.ap('10'));
+    assertTruthy(isZero(dst));
+  },
+
+  'mod(99, 10) = 9': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('99'), ctx.ap('10'));
+    assertEqual(ctx.toString(dst), '9');
+  },
+
+  // fractional divisor
+  'mod(0.75, 0.5) = 0.25': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('0.75'), ctx.ap('0.5'));
+    assertEqual(ctx.toString(dst), '0.25');
+  },
+
+  'mod(0.75, 0.25) = 0 (exact fractional)': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('0.75'), ctx.ap('0.25'));
+    assertTruthy(isZero(dst));
+  },
+
+  // negative dividend, positive divisor (result in [0, b))
+  'mod(-7, 3) = 2': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('-7'), ctx.ap('3'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'mod(-1, 3) = 2': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('-1'), ctx.ap('3'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'mod(-10, 3) = 2': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('-10'), ctx.ap('3'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  'mod(-9, 3) = 0 (exact negative)': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('-9'), ctx.ap('3'));
+    assertTruthy(isZero(dst));
+  },
+
+  // multi-limb: 65537 = 3 * 21845 + 2
+  'mod(65537, 3) = 2 (multi-limb)': () => {
+    const ctx = new APContext(64), dst = ctx.ap();
+    ctx.mod(dst, ctx.ap('65537'), ctx.ap('3'));
+    assertEqual(ctx.toString(dst), '2');
+  },
+
+  // pre-allocated tmp
+  'pre-allocated tmp reused correctly': () => {
+    const ctx = new APContext(64), dst = ctx.ap(), tmp = ctx.ap();
+    ctx.mod(dst, ctx.ap('10'), ctx.ap('3'), tmp);
+    assertEqual(ctx.toString(dst), '1');
   },
 
 }).runTests();
